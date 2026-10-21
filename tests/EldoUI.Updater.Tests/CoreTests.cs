@@ -937,4 +937,27 @@ namespace EldoUI.Updater.Tests
 			}
 		}
 	}
+
+	public class BootCheckTests
+	{
+		static readonly DateTime Now = new DateTime(2026, 10, 22, 7, 0, 0, DateTimeKind.Utc);
+
+		[Fact]
+		public void ActiveAtStartUntilACheckReachesGitHub()
+		{
+			var b = new BootCheck(Now);
+			Assert.True(b.Active(Now));
+			Assert.True(b.Active(Now.AddMinutes(3)));
+			b.Finish();
+			Assert.False(b.Active(Now.AddMinutes(3)));
+		}
+
+		[Fact]
+		public void EndsAfterTenMinutesWithoutNetwork()
+		{
+			var b = new BootCheck(Now);
+			Assert.True(b.Active(Now.AddMinutes(9)));
+			Assert.False(b.Active(Now.AddMinutes(10)));
+		}
+	}
 }
