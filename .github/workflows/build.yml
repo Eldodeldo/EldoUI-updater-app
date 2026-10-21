@@ -97,6 +97,9 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
+      - name: Unit tests (with the Linux-only Wine tests)
+        run: dotnet test tests/EldoUI.Updater.Tests -c Release --nologo
+
       - name: Tools for the AppImage
         run: sudo apt-get update -qq && sudo apt-get install -y -qq desktop-file-utils
 
