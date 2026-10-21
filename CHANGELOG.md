@@ -2,6 +2,11 @@
 
 Each release of the EldoUI Updater. The newest is at the top.
 
+## [1.0.1] - 2026-10-21
+
+### Fixed
+- A new EldoUI release whose download is not attached yet no longer shows as a failed update. The updater installs the newest release that has its download and checks again later.
+
 ## [1.0.0] - 2026-10-21
 
 ### New
