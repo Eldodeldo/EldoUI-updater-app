@@ -1,4 +1,5 @@
-// Version numbers as EldoUI writes them: "0.7.0002", "v0.7.0002", "1.0.0".
+// Version numbers as EldoUI writes them: "0.7.0002", "v0.7.0002", "1.0.0". A pre-release such as
+// "0.7.0002-beta.1" counts as older than the release of the same number.
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -16,11 +17,15 @@ namespace EldoUI.Updater.Core
 			return Parts(v) == null ? null : v;
 		}
 
-		/// <summary>Negative when a is older than b, 0 when equal, positive when newer. Unusable values count as oldest.</summary>
+		/// <summary>
+		/// Negative when a is older than b, 0 when equal, positive when newer. Unusable values count as oldest.
+		/// With equal numbers, a pre-release ("1.2.3-beta") is older than the release itself.
+		/// </summary>
 		public static int Compare(string a, string b)
 		{
-			var pa = Parts(Clean(a));
-			var pb = Parts(Clean(b));
+			string ca = Clean(a), cb = Clean(b);
+			var pa = Parts(ca);
+			var pb = Parts(cb);
 			if (pa == null && pb == null) return 0;
 			if (pa == null) return -1;
 			if (pb == null) return 1;
@@ -31,7 +36,19 @@ namespace EldoUI.Updater.Core
 				long y = i < pb.Count ? pb[i] : 0;
 				if (x != y) return x < y ? -1 : 1;
 			}
+			bool preA = IsPreRelease(ca), preB = IsPreRelease(cb);
+			if (preA != preB) return preA ? -1 : 1;
 			return 0;
+		}
+
+		/// <summary>True for a version with a pre-release part: "1.2.3-beta.1". Build data after "+" does not count.</summary>
+		public static bool IsPreRelease(string version)
+		{
+			string v = Clean(version);
+			if (v == null) return false;
+			int plus = v.IndexOfAny(new[] { '+', ' ' });
+			if (plus >= 0) v = v.Substring(0, plus);
+			return v.IndexOf('-') >= 0;
 		}
 
 		public static bool IsNewer(string candidate, string current)

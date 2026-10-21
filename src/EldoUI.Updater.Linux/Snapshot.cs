@@ -28,6 +28,7 @@ namespace EldoUI.Updater
 				Tuple.Create("nofolder", new ViewState { Latest = "0.7.0002", Kind = StatusKind.Warn, Status = "state.nofolder", Action = MainAction.ChooseFolder, Autostart = true, AutoInstall = true }),
 				Tuple.Create("appupdate", new ViewState { Installed = "0.7.0002", Latest = "0.7.0002", Folder = folder, LastCheck = DateTime.UtcNow.AddMinutes(-3), Kind = StatusKind.Ok, Status = "state.uptodate", Autostart = true, AutoInstall = true, AppNew = "9.9.9", AppAt = DateTime.UtcNow.AddHours(23.5) }),
 				Tuple.Create("failed", new ViewState { Installed = "0.7.0000", Latest = "0.7.0002", Folder = folder, LastCheck = DateTime.UtcNow.AddMinutes(-1), Kind = StatusKind.Error, Status = "state.failed", Autostart = false, AutoInstall = true }),
+				Tuple.Create("unverified", new ViewState { Installed = "0.7.0000", Latest = "0.7.0002", Folder = folder, LastCheck = DateTime.UtcNow.AddMinutes(-1), Kind = StatusKind.Error, Status = "state.unverified", Autostart = false, AutoInstall = true }),
 			};
 			foreach (string lang in new[] { "en", "da" })
 			{
@@ -36,7 +37,7 @@ namespace EldoUI.Updater
 				{
 					var v = st.Item2;
 					string key = v.Status;
-					v.Status = key == "state.installing" || key == "state.available" ? T.F(key, v.Latest) : T.S(key);
+					v.Status = key == "state.installing" || key == "state.available" || key == "state.unverified" ? T.F(key, v.Latest) : T.S(key);
 					var w = new MainWindow(Assets.Logo());
 					w.Show();
 					w.Render(v);
