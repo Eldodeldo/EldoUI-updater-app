@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    .NET Framework 4.8 is part of every Windows 10 and 11, so the exe needs no runtime and stays a few
+    hundred KB. It builds with the plain .NET SDK on Windows or Linux (reference assemblies from NuGet).
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <RootNamespace>EldoUI.Updater</RootNamespace>
+    <AssemblyName>EldoUI Updater</AssemblyName>
+    <Version>1.0.0</Version>
+    <Product>EldoUI Updater</Product>
+    <Company>Eldodeldo</Company>
+    <Authors>Eldodeldo</Authors>
+    <Description>Keeps EldoUI up to date for WoW: Forever</Description>
+    <Copyright>Copyright 2026 Eldodeldo</Copyright>
+    <ApplicationIcon>Assets\eldoui.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <DebugType>embedded</DebugType>
+    <Deterministic>true</Deterministic>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\Core\*.cs" Link="Core\%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Assets\eldoui.ico" />
+    <EmbeddedResource Include="Assets\logo.png" />
+    <!-- Written next to the installed exe, so the single downloaded exe is all a player needs. -->
+    <EmbeddedResource Include="App.config" LogicalName="EldoUI.Updater.exe.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Configuration" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+</Project>
