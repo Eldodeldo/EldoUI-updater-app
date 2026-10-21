@@ -38,6 +38,10 @@ namespace EldoUI.Updater
 		// After a failed check: wait 15 minutes, then twice as long each time, at most the normal interval.
 		DateTime _retryAt = DateTime.MinValue;
 		TimeSpan _backoff = TimeSpan.FromMinutes(15);
+		// The check at start installs what it finds at once and quietly.
+		readonly BootCheck _boot = new BootCheck(DateTime.UtcNow);
+		// A window asked for at start opens once that check is done, so a self-update never closes it again.
+		bool _showPending;
 
 		public TrayApp(bool showWindow, bool justUpdated, Action shutdown)
 		{
@@ -100,9 +104,11 @@ namespace EldoUI.Updater
 			if (justUpdated && SelfUpdatePolicy.Clear(_settings)) Save();
 			FindFolder();
 			UpdateView(null);
-			if (showWindow) ShowWindow();
-			// The first check soon after start, so a login does not wait three hours.
-			DispatcherTimer.RunOnce(() => Check(showWindow, false), TimeSpan.FromMilliseconds(showWindow ? 800 : 20000));
+			_showPending = showWindow;
+			// The first check right at start: what it finds installs before the window opens.
+			DispatcherTimer.RunOnce(() => Check(showWindow, false), TimeSpan.FromMilliseconds(300));
+			// A slow network does not keep the window waiting long.
+			DispatcherTimer.RunOnce(ShowPending, TimeSpan.FromSeconds(8));
 		}
 
 		public TrayIcon Tray { get { return _tray; } }
@@ -117,6 +123,8 @@ namespace EldoUI.Updater
 		bool Due()
 		{
 			if (DateTime.UtcNow < _retryAt) return false;
+			// Until the check at start has reached GitHub, every minute counts, however recent the last check.
+			if (_boot.Active(DateTime.UtcNow)) return true;
 			return !_settings.LastCheck.HasValue || DateTime.UtcNow - _settings.LastCheck.Value.ToUniversalTime() >= CheckEvery;
 		}
 
@@ -212,7 +220,13 @@ namespace EldoUI.Updater
 				return;
 			}
 			_last = r;
-			if (r.Outcome == CheckOutcome.Offline || r.Outcome == CheckOutcome.Failed)
+			bool booting = _boot.Active(DateTime.UtcNow);
+			if ((r.Outcome == CheckOutcome.Offline || r.Outcome == CheckOutcome.Failed) && booting)
+			{
+				// At start the network may not be up yet (a login): try again in a minute.
+				_retryAt = DateTime.UtcNow + BootCheck.RetryEvery;
+			}
+			else if (r.Outcome == CheckOutcome.Offline || r.Outcome == CheckOutcome.Failed)
 			{
 				_retryAt = DateTime.UtcNow + _backoff;
 				_backoff = TimeSpan.FromTicks(Math.Min(_backoff.Ticks * 2, CheckEvery.Ticks));
@@ -224,18 +238,28 @@ namespace EldoUI.Updater
 			}
 			Save();
 			UpdateView(r);
-			Announce(r, user);
-			await CheckApp();
+			Announce(r, user, booting);
+			await CheckApp(booting);
+			if (booting && r.Outcome != CheckOutcome.Offline && r.Outcome != CheckOutcome.Failed) _boot.Finish();
+			ShowPending();
 		}
 
-		void Announce(CheckResult r, bool user)
+		void ShowPending()
+		{
+			if (!_showPending) return;
+			_showPending = false;
+			ShowWindow();
+		}
+
+		void Announce(CheckResult r, bool user, bool booting)
 		{
 			switch (r.Outcome)
 			{
 				case CheckOutcome.Installed:
 					_settings.AnnouncedVersion = r.Installed;
 					Save();
-					if (!user || !_form.IsVisible) Notify(T.F("toast.installed.title", r.Installed), T.S("toast.installed.body"));
+					// At start the install is quiet: the window shows the new version.
+					if (!booting && (!user || !_form.IsVisible)) Notify(T.F("toast.installed.title", r.Installed), T.S("toast.installed.body"));
 					break;
 				case CheckOutcome.UpdateAvailable:
 					// Each new version is announced once, not on every check.
@@ -314,8 +338,11 @@ namespace EldoUI.Updater
 			RefreshMenu();
 		}
 
-		/// <summary>Looks for a newer updater at every check. It is only shown; it installs itself 24 hours after it was first seen.</summary>
-		async Task CheckApp()
+		/// <summary>
+		/// Looks for a newer updater at every check. Found at start, it installs at once; found later, it is only shown
+		/// and installs itself 24 hours after it was first seen.
+		/// </summary>
+		async Task CheckApp(bool booting)
 		{
 			if (!_settings.SelfUpdate || _appBusy) return;
 			var r = await _engine.NewerUpdaterAsync(Setup.Version, _quit.Token, UpdateEngine.LinuxUpdaterAssetPattern);
@@ -330,9 +357,10 @@ namespace EldoUI.Updater
 			_app = r;
 			_appAt = SelfUpdatePolicy.Note(_settings, r.Version, DateTime.UtcNow);
 			Save();
-			if (first) Log.Write("Updater " + r.Version + " is out; it installs itself at " + _appAt.ToLocalTime().ToString("g"));
+			if (booting) Log.Write("Updater " + r.Version + " is out; installing it now, at start");
+			else if (first) Log.Write("Updater " + r.Version + " is out; it installs itself at " + _appAt.ToLocalTime().ToString("g"));
 			UpdateView(_last);
-			if (SelfUpdatePolicy.Due(_appAt, DateTime.UtcNow)) await InstallAppAsync();
+			if (booting || SelfUpdatePolicy.Due(_appAt, DateTime.UtcNow)) await InstallAppAsync();
 		}
 
 		async void InstallApp()
@@ -357,7 +385,7 @@ namespace EldoUI.Updater
 			{
 				await _engine.DownloadUpdaterAsync(_app, target, _quit.Token, UpdateEngine.LinuxUpdaterAssetPattern);
 				Log.Write("Updating the updater to " + _app.Version);
-				Setup.ReplaceAndRestart(target);
+				Setup.ReplaceAndRestart(target, _showPending || _form.IsVisible);
 				Exit();
 			}
 			catch (OperationCanceledException)
