@@ -138,6 +138,14 @@ namespace EldoUI.Updater.Tests
 		}
 
 		[Fact]
+		public void ListsOnlyPublishedReleases()
+		{
+			var list = Release.ListFromGitHub("[" + Sample + ",{\"tag_name\":\"v0.8.0-beta\",\"prerelease\":true},{\"tag_name\":\"v0.9\",\"draft\":true}]");
+			Assert.Single(list);
+			Assert.Equal("0.7.0002", list[0].Version);
+		}
+
+		[Fact]
 		public void RefusesPreReleases()
 		{
 			Assert.Null(Release.FromGitHub("{\"tag_name\":\"v1\",\"prerelease\":true}"));
@@ -361,7 +369,7 @@ namespace EldoUI.Updater.Tests
 
 	public class EngineTests
 	{
-		const string Latest = "https://api.github.com/repos/Eldodeldo/EldoUI/releases/latest";
+		const string Latest = "https://api.github.com/repos/Eldodeldo/EldoUI/releases?per_page=10";
 
 		static (FakeWeb web, string url) Serve(TempDir t, string version, bool goodSha = true)
 		{
@@ -373,7 +381,7 @@ namespace EldoUI.Updater.Tests
 			using (var f = File.OpenRead(zip))
 				sha = Web.Hex(h.ComputeHash(f));
 			web.Files[url] = zip;
-			web.Api[Latest] = FakeWeb.ReleaseJson(version, url, new FileInfo(zip).Length, goodSha ? sha : new string('0', 64));
+			web.Api[Latest] = "[" + FakeWeb.ReleaseJson(version, url, new FileInfo(zip).Length, goodSha ? sha : new string('0', 64)) + "]";
 			return (web, url);
 		}
 
@@ -453,6 +461,35 @@ namespace EldoUI.Updater.Tests
 				web.Fail = new System.Net.Http.HttpRequestException("no network");
 				var r = await new UpdateEngine(web, t.Sub("tmp"), null).CheckAsync(With(t), false, CancellationToken.None);
 				Assert.Equal(CheckOutcome.Offline, r.Outcome);
+			}
+		}
+
+		[Fact]
+		public async Task SkipsANewestReleaseWithoutItsZip()
+		{
+			using (var t = new TempDir())
+			{
+				var (web, _) = Serve(t, "0.7.0002");
+				string older = web.Api[Latest].TrimStart('[').TrimEnd(']');
+				web.Api[Latest] = "[{\"tag_name\":\"v0.7.0003\",\"draft\":false,\"prerelease\":false,\"assets\":[]}," + older + "]";
+				var s = With(t);
+				var r = await new UpdateEngine(web, t.Sub("tmp"), null).CheckAsync(s, false, CancellationToken.None);
+				Assert.Equal(CheckOutcome.Installed, r.Outcome);
+				Assert.Equal("0.7.0002", r.Installed);
+			}
+		}
+
+		[Fact]
+		public async Task NoZipAnywhereIsNotAFailure()
+		{
+			using (var t = new TempDir())
+			{
+				var web = new FakeWeb();
+				web.Api[Latest] = "[{\"tag_name\":\"v0.7.0000\",\"draft\":false,\"prerelease\":false,\"assets\":[]}]";
+				var r = await new UpdateEngine(web, t.Sub("tmp"), null).CheckAsync(With(t), false, CancellationToken.None);
+				Assert.Equal(CheckOutcome.NoDownload, r.Outcome);
+				Assert.Equal("0.7.0000", r.Latest);
+				Assert.Equal(0, web.Downloads);
 			}
 		}
 
