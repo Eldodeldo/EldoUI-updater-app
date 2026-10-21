@@ -23,6 +23,9 @@ namespace EldoUI.Updater.Core
 		public string AnnouncedVersion = "";
 		public DateTime? LastCheck;
 		public bool Welcomed;
+		/// <summary>A newer version of the updater itself, and when it was first seen (it installs 24 hours later).</summary>
+		public string UpdaterSeenVersion = "";
+		public DateTime? UpdaterSeenAt;
 
 		public static Settings Load(string path)
 		{
@@ -39,10 +42,9 @@ namespace EldoUI.Updater.Core
 				s.Welcomed = o.Bool("welcomed");
 				var folders = o.Arr("installedFolders");
 				if (folders != null) s.InstalledFolders = folders.OfType<string>().ToList();
-				DateTime last;
-				if (DateTime.TryParse(o.Str("lastCheck"), System.Globalization.CultureInfo.InvariantCulture,
-					System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out last))
-					s.LastCheck = last;
+				s.LastCheck = Time(o.Str("lastCheck"));
+				s.UpdaterSeenVersion = o.Str("updaterSeenVersion") ?? "";
+				s.UpdaterSeenAt = Time(o.Str("updaterSeenAt"));
 			}
 			catch
 			{
@@ -61,14 +63,30 @@ namespace EldoUI.Updater.Core
 				{ "language", Language ?? "auto" },
 				{ "installedFolders", InstalledFolders ?? new List<string>() },
 				{ "announcedVersion", AnnouncedVersion ?? "" },
-				{ "lastCheck", LastCheck.HasValue ? LastCheck.Value.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ", System.Globalization.CultureInfo.InvariantCulture) : null },
+				{ "lastCheck", Time(LastCheck) },
 				{ "welcomed", Welcomed },
+				{ "updaterSeenVersion", UpdaterSeenVersion ?? "" },
+				{ "updaterSeenAt", Time(UpdaterSeenAt) },
 			};
 			Directory.CreateDirectory(Path.GetDirectoryName(path));
 			string tmp = path + ".tmp";
 			File.WriteAllText(tmp, Json.Write(o), new UTF8Encoding(false));
 			if (File.Exists(path)) File.Replace(tmp, path, null);
 			else File.Move(tmp, path);
+		}
+
+		static DateTime? Time(string text)
+		{
+			DateTime t;
+			if (DateTime.TryParse(text, System.Globalization.CultureInfo.InvariantCulture,
+				System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out t))
+				return t;
+			return null;
+		}
+
+		static string Time(DateTime? t)
+		{
+			return t.HasValue ? t.Value.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ", System.Globalization.CultureInfo.InvariantCulture) : null;
 		}
 	}
 }
