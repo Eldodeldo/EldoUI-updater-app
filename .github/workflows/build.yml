@@ -1,10 +1,11 @@
 name: build
 
 # Every pull request and every push to main: unit tests, the Windows build, the self-test on the real
-# .NET Framework and pictures of the window (artifact "snapshots").
-# A push to main whose <Version> in the project file is newer than the newest release also publishes it:
-# the release is made as a draft, gets the exe and its checksum, and is only then published, so the
-# updater never sees a half-finished release.
+# .NET Framework and pictures of the window (artifact "snapshots"); the Linux AppImage with its own
+# self-test and pictures (artifact "snapshots-linux").
+# A push to main whose <Version> in src/Directory.Build.props is newer than the newest release also
+# publishes it: the release is made as a draft, gets the exe, the AppImage and their checksums, and is
+# only then published, so the updater never sees a half-finished release.
 
 on:
   pull_request:
@@ -38,9 +39,9 @@ jobs:
       - name: Version
         id: version
         run: |
-          $xml = [xml](Get-Content src/EldoUI.Updater/EldoUI.Updater.csproj)
+          $xml = [xml](Get-Content src/Directory.Build.props)
           $v = ($xml.Project.PropertyGroup | ForEach-Object { $_.Version } | Where-Object { $_ }) | Select-Object -First 1
-          if ($v -notmatch '^\d+\.\d+\.\d+$') { throw "Version in the project file must be x.y.z, got '$v'" }
+          if ($v -notmatch '^\d+\.\d+\.\d+$') { throw "Version in src/Directory.Build.props must be x.y.z, got '$v'" }
           "version=$v" >> $env:GITHUB_OUTPUT
           Write-Host "Version $v"
 
@@ -86,9 +87,52 @@ jobs:
           path: publish/*
           retention-days: 14
 
+  linux:
+    name: Build the AppImage (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Tools for the AppImage
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq desktop-file-utils
+
+      - name: Build the AppImage
+        run: bash packaging/linux/build-appimage.sh publish
+
+      - name: Self-test of the AppImage
+        run: APPIMAGE_EXTRACT_AND_RUN=1 ./publish/EldoUI-Updater-x86_64.AppImage --selftest
+
+      - name: Pictures of the window
+        timeout-minutes: 5
+        run: |
+          APPIMAGE_EXTRACT_AND_RUN=1 ./publish/EldoUI-Updater-x86_64.AppImage --snapshot snapshots
+          ls -l snapshots
+
+      - name: Checksum
+        run: |
+          cd publish
+          sha256sum EldoUI-Updater-x86_64.AppImage > SHA256SUMS-linux.txt
+          cat SHA256SUMS-linux.txt
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: snapshots-linux
+          path: snapshots/*.png
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: EldoUI-Updater-Linux
+          path: publish/*
+          retention-days: 14
+
   release:
     name: Publish ${{ needs.build.outputs.version }}
-    needs: build
+    needs: [build, linux]
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
@@ -106,7 +150,7 @@ jobs:
           latest="${latest#v}"
           echo "Newest release: ${latest:-none}, this build: $VERSION"
           if [ -n "$latest" ] && [ "$(printf '%s\n%s\n' "$latest" "$VERSION" | sort -V | tail -1)" = "$latest" ]; then
-            echo "Not newer: nothing to publish (raise <Version> in the project file to release)."
+            echo "Not newer: nothing to publish (raise <Version> in src/Directory.Build.props to release)."
             echo "publish=false" >> "$GITHUB_OUTPUT"
           else
             echo "publish=true" >> "$GITHUB_OUTPUT"
@@ -117,6 +161,20 @@ jobs:
         with:
           name: EldoUI-Updater
           path: publish
+
+      - uses: actions/download-artifact@v4
+        if: steps.guard.outputs.publish == 'true'
+        with:
+          name: EldoUI-Updater-Linux
+          path: publish-linux
+
+      - name: One checksum file for both
+        if: steps.guard.outputs.publish == 'true'
+        run: |
+          mv publish-linux/EldoUI-Updater-x86_64.AppImage publish/
+          sed -i "s/\r$//" publish/SHA256SUMS.txt
+          cat publish-linux/SHA256SUMS-linux.txt >> publish/SHA256SUMS.txt
+          (cd publish && sha256sum -c SHA256SUMS.txt)
 
       - name: Release notes
         if: steps.guard.outputs.publish == 'true'
@@ -138,5 +196,5 @@ jobs:
           fi
           gh release create "v$VERSION" --repo "$GITHUB_REPOSITORY" --draft \
             --title "EldoUI Updater $VERSION" --notes-file notes.md --target "$GITHUB_SHA" \
-            publish/EldoUI-Updater.exe publish/SHA256SUMS.txt
+            publish/EldoUI-Updater.exe publish/EldoUI-Updater-x86_64.AppImage publish/SHA256SUMS.txt
           gh release edit "v$VERSION" --repo "$GITHUB_REPOSITORY" --draft=false --latest

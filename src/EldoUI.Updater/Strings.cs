@@ -1,5 +1,5 @@
-// Every text the player sees, in English and Danish. Windows' display language picks one,
-// unless the player chose a language in the menu.
+// Every text the player sees, in English and Danish. The system's display language picks one,
+// unless the player chose a language in the menu. The Linux app shares this file and adds its own words.
 using System.Collections.Generic;
 using System.Globalization;
 
@@ -17,6 +17,13 @@ namespace EldoUI.Updater
 				lang = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "da" ? "da" : "en";
 			Lang = lang;
 			_table = lang == "da" ? Da : En;
+		}
+
+		/// <summary>Adds or replaces texts (the Linux app's own wording for Linux things).</summary>
+		public static void Add(Dictionary<string, string> en, Dictionary<string, string> da)
+		{
+			foreach (var kv in en) En[kv.Key] = kv.Value;
+			foreach (var kv in da) Da[kv.Key] = kv.Value;
 		}
 
 		public static string S(string key)
