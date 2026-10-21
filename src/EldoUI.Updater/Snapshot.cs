@@ -20,6 +20,7 @@ namespace EldoUI.Updater
 				Tuple.Create("nofolder", new ViewState { Latest = "0.7.0002", Kind = StatusKind.Warn, Status = "state.nofolder", Action = MainAction.ChooseFolder, Autostart = true, AutoInstall = true }),
 				Tuple.Create("appupdate", new ViewState { Installed = "0.7.0002", Latest = "0.7.0002", Folder = @"C:\Program Files (x86)\World of Warcraft\_forever_\Interface\AddOns", LastCheck = DateTime.UtcNow.AddMinutes(-3), Kind = StatusKind.Ok, Status = "state.uptodate", Autostart = true, AutoInstall = true, AppNew = "9.9.9", AppAt = DateTime.UtcNow.AddHours(23.5) }),
 				Tuple.Create("failed", new ViewState { Installed = "0.7.0000", Latest = "0.7.0002", Folder = @"C:\Program Files (x86)\World of Warcraft\_forever_\Interface\AddOns", LastCheck = DateTime.UtcNow.AddMinutes(-1), Kind = StatusKind.Error, Status = "state.failed", Autostart = false, AutoInstall = true }),
+				Tuple.Create("unverified", new ViewState { Installed = "0.7.0000", Latest = "0.7.0002", Folder = @"C:\Program Files (x86)\World of Warcraft\_forever_\Interface\AddOns", LastCheck = DateTime.UtcNow.AddMinutes(-1), Kind = StatusKind.Error, Status = "state.unverified", Autostart = false, AutoInstall = true }),
 			};
 			int count = 0;
 			foreach (string lang in new[] { "en", "da" })
@@ -29,7 +30,7 @@ namespace EldoUI.Updater
 				{
 					var v = st.Item2;
 					string key = v.Status;
-					v.Status = key == "state.installing" || key == "state.available" ? T.F(key, v.Latest)
+					v.Status = key == "state.installing" || key == "state.available" || key == "state.unverified" ? T.F(key, v.Latest)
 						: T.S(key);
 					using (var form = new MainForm(Assets.Icon(false), Assets.Logo()) { StartPosition = FormStartPosition.Manual, Location = new Point(-3000, -3000), ShowInTaskbar = false })
 					{

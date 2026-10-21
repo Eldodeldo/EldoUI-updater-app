@@ -62,13 +62,19 @@ once with `--appimage-extract-and-run` to try it.
 
 - Asks GitHub's public API for the newest release of `Eldodeldo/EldoUI` (no account, no token, nothing
   sent about you). Unchanged answers are cached, so it stays far below GitHub's limits.
-- Downloads `EldoUI-<version>.zip` from github.com over HTTPS and checks its size and the SHA-256 that GitHub
-  computed for the file.
+- Downloads `EldoUI-<version>.zip` from github.com over HTTPS and checks its size and its SHA-256 against the
+  checksum published with the release: the one GitHub computed for the file, or a checksum file in the release
+  (`SHA256SUMS.txt` or `<file>.sha256`). A release without a checksum, or a download that does not match it, is
+  never installed: nothing in AddOns changes, the window says so, and the updater tries again at the next check.
 - Checks the zip: only `EldoUI` folders (`EldoUI`, `EldoUI_*`), each with its own `.toc`, no unsafe paths.
 - Unpacks it next to AddOns, then swaps each folder in. If anything fails, the old folders are put back.
-  A folder a new release no longer has is removed, but only if the updater installed it. Other addons
-  and the game's `WTF` folder (your settings) are never touched.
-- Updates itself from this repository's releases: a new version shows quietly in the window and menu (no pop-up) and installs itself 24 hours later, or at once with "Update now".
+  The updater manages only EldoUI's own folders: the ones in the zip and the ones it installed earlier. A
+  folder a new release no longer has is removed, but only if the updater installed it. Every other folder in
+  AddOns (other addons, and any EldoUI folder that is neither in the zip nor installed by the updater) and
+  the game's `WTF` folder (your settings) are never touched.
+- A pre-release (a version such as `1.2.3-beta`) counts as older than the release of the same number, so the
+  release replaces it at the next check.
+- Updates itself from this repository's releases, with the same checksum rule: a new version shows quietly in the window and menu (no pop-up) and installs itself 24 hours later, or at once with "Update now".
 
 Files on Windows:
 

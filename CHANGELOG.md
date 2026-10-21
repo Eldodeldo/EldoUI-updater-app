@@ -2,6 +2,15 @@
 
 Each release of the EldoUI Updater. The newest is at the top.
 
+## [1.1.1] - 2026-10-21
+
+### Improved
+- EldoUI is installed only when the download matches the checksum published with its release: the one GitHub keeps for the file, or a checksum file in the release. If a release has no checksum, or the download does not match it, nothing in your AddOns folder changes; the window says so, and the updater tries again at the next check.
+- The updater's own updates follow the same rule.
+
+### Fixed
+- An EldoUI pre-release is replaced by the full release of the same version at the next check, instead of counting as up to date.
+
 ## [1.1.0] - 2026-10-21
 
 ### New

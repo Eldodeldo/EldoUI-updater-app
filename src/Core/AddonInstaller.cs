@@ -4,6 +4,9 @@
 // Everything is unpacked next to AddOns first and checked; only then is each old folder moved aside
 // and the new one moved in. If a move fails, the old folders are put back. Saved settings live in
 // the game's WTF folder, so they are never touched.
+//
+// The updater manages only EldoUI's own folders: the ones in the zip, and the ones it installed earlier.
+// Every other folder in AddOns, including an EldoUI folder that is in neither list, is left exactly as it is.
 using System;
 using System.Collections.Generic;
 using System.IO;

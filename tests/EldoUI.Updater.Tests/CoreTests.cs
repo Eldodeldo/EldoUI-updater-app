@@ -57,7 +57,12 @@ namespace EldoUI.Updater.Tests
 		[InlineData("0.7.0010", "0.7.0009", 1)]
 		[InlineData("0.6.6005", "0.7.0000", -1)]
 		[InlineData("1.0", "1.0.0", 0)]
-		[InlineData("1.2.3-beta", "1.2.3", 0)]
+		[InlineData("1.2.3-beta", "1.2.3", -1)]
+		[InlineData("1.2.3", "1.2.3-beta", 1)]
+		[InlineData("0.7.0002-beta.1a2b3c4", "0.7.0002", -1)]
+		[InlineData("0.7.0002-beta.1a2b3c4", "0.7.0001", 1)]
+		[InlineData("1.2.3-beta", "1.2.3-rc", 0)]
+		[InlineData("1.2.3+build.5", "1.2.3", 0)]
 		[InlineData("garbage", "0.0.1", -1)]
 		public void Compares(string a, string b, int sign)
 		{
@@ -70,6 +75,16 @@ namespace EldoUI.Updater.Tests
 			Assert.False(Versions.IsNewer("v1.0.0", "1.0.0"));
 			Assert.False(Versions.IsNewer(null, "1.0.0"));
 			Assert.True(Versions.IsNewer("1.0.0", null));
+		}
+
+		[Fact]
+		public void APreReleaseIsReplacedByItsRelease()
+		{
+			Assert.True(Versions.IsNewer("0.7.0002", "0.7.0002-beta.abc"));
+			Assert.False(Versions.IsNewer("0.7.0002", "0.7.0003-beta.abc"));
+			Assert.True(Versions.IsPreRelease("v1.2.3-beta+x"));
+			Assert.False(Versions.IsPreRelease("1.2.3+build-5"));
+			Assert.False(Versions.IsPreRelease("1.2.3"));
 		}
 	}
 
@@ -146,10 +161,66 @@ namespace EldoUI.Updater.Tests
 		}
 
 		[Fact]
+		public void FindsChecksumFilesForADownload()
+		{
+			var zip = new ReleaseAsset { Name = "EldoUI-1.0.zip" };
+			Assert.True(Release.IsChecksumFileFor(new ReleaseAsset { Name = "SHA256SUMS.txt" }, zip));
+			Assert.True(Release.IsChecksumFileFor(new ReleaseAsset { Name = "sha256sums" }, zip));
+			Assert.True(Release.IsChecksumFileFor(new ReleaseAsset { Name = "EldoUI-1.0.zip.sha256" }, zip));
+			Assert.False(Release.IsChecksumFileFor(new ReleaseAsset { Name = "Other.zip.sha256" }, zip));
+			Assert.False(Release.IsChecksumFileFor(new ReleaseAsset { Name = "notes.txt" }, zip));
+			Assert.False(Release.IsChecksumFileFor(zip, zip));
+		}
+
+		[Fact]
 		public void RefusesPreReleases()
 		{
 			Assert.Null(Release.FromGitHub("{\"tag_name\":\"v1\",\"prerelease\":true}"));
 			Assert.Null(Release.FromGitHub("{\"tag_name\":\"v1\",\"draft\":true}"));
+		}
+	}
+
+	public class ChecksumTests
+	{
+		static readonly string A = new string('a', 64);
+		static readonly string B = new string('b', 64);
+
+		[Fact]
+		public void ReadsTheLineForTheFile()
+		{
+			string text = B + "  EldoUI-Updater.exe\r\n" + A.ToUpperInvariant() + " *EldoUI-1.0.zip\r\n";
+			Assert.Equal(A, Checksums.Find(text, "EldoUI-1.0.zip"));
+			Assert.Equal(B, Checksums.Find(text, "eldoui-updater.exe"));
+			Assert.Null(Checksums.Find(text, "EldoUI-2.0.zip"));
+		}
+
+		[Fact]
+		public void IgnoresAFolderInFrontOfTheName()
+		{
+			Assert.Equal(A, Checksums.Find(A + "  ./dist/EldoUI-1.0.zip\n", "EldoUI-1.0.zip"));
+		}
+
+		[Fact]
+		public void AHashAloneCountsOnlyInItsOwnFile()
+		{
+			Assert.Null(Checksums.Find(A + "\n", "EldoUI-1.0.zip"));
+			Assert.Equal(A, Checksums.Find(A + "  \n", "EldoUI-1.0.zip", bareHashAllowed: true));
+		}
+
+		[Fact]
+		public void TwoDifferentHashesCountAsNone()
+		{
+			Assert.Null(Checksums.Find(A + "  EldoUI-1.0.zip\n" + B + "  EldoUI-1.0.zip\n", "EldoUI-1.0.zip"));
+			Assert.Equal(A, Checksums.Find(A + "  EldoUI-1.0.zip\n" + A + "  EldoUI-1.0.zip\n", "EldoUI-1.0.zip"));
+		}
+
+		[Theory]
+		[InlineData("")]
+		[InlineData("not a checksum file")]
+		[InlineData("abc123  EldoUI-1.0.zip")]
+		public void IgnoresLinesThatAreNotChecksums(string text)
+		{
+			Assert.Null(Checksums.Find(text, "EldoUI-1.0.zip"));
 		}
 	}
 
@@ -162,7 +233,8 @@ namespace EldoUI.Updater.Tests
 			{
 				string addOns = t.Sub("WoW", "_classic_beta_", "Interface", "AddOns");
 				Directory.CreateDirectory(Path.Combine(addOns, "OtherAddon"));
-				Directory.CreateDirectory(Path.Combine(addOns, "EldoUI_Dev"));
+				Directory.CreateDirectory(Path.Combine(addOns, "EldoUI_Custom"));
+				File.WriteAllText(Path.Combine(addOns, "EldoUI_Custom", "mine.lua"), "keep");
 
 				var r1 = AddonInstaller.Install(Zips.Make(t.Path, "0.7.0001", "EldoUI", "EldoUI_Old"), addOns, null);
 				Assert.Equal("0.7.0001", r1.Version);
@@ -177,7 +249,7 @@ namespace EldoUI.Updater.Tests
 				Assert.False(File.Exists(Path.Combine(addOns, "EldoUI", "stale.lua")));
 				Assert.True(Directory.Exists(Path.Combine(addOns, "EldoUI_LootData")));
 				Assert.True(Directory.Exists(Path.Combine(addOns, "OtherAddon")));
-				Assert.True(Directory.Exists(Path.Combine(addOns, "EldoUI_Dev")), "a folder the updater never installed is never removed");
+				Assert.Equal("keep", File.ReadAllText(Path.Combine(addOns, "EldoUI_Custom", "mine.lua")));
 				Assert.Empty(Directory.GetDirectories(Path.GetDirectoryName(addOns), ".eldoui-updater-*"));
 			}
 		}
@@ -543,10 +615,23 @@ namespace EldoUI.Updater.Tests
 				return Task.FromResult(Web.Hex(sha.ComputeHash(f)));
 		}
 
-		public static string ReleaseJson(string version, string url, long size, string sha)
+		public static string ReleaseJson(string version, string url, long size, string sha, params string[] moreAssets)
 		{
-			return "{\"tag_name\":\"v" + version + "\",\"draft\":false,\"prerelease\":false,\"assets\":[{\"name\":\"EldoUI-" + version + ".zip\",\"size\":" + size
-				+ ",\"browser_download_url\":\"" + url + "\"" + (sha != null ? ",\"digest\":\"sha256:" + sha + "\"" : "") + "}]}";
+			return "{\"tag_name\":\"v" + version + "\",\"draft\":false,\"prerelease\":false,\"assets\":[" + AssetJson("EldoUI-" + version + ".zip", url, size, sha)
+				+ string.Concat(moreAssets.Select(a => "," + a)) + "]}";
+		}
+
+		public static string AssetJson(string name, string url, long size, string sha)
+		{
+			return "{\"name\":\"" + name + "\",\"size\":" + size + ",\"browser_download_url\":\"" + url + "\""
+				+ (sha != null ? ",\"digest\":\"sha256:" + sha + "\"" : "") + "}";
+		}
+
+		public static string Sha(string path)
+		{
+			using (var h = SHA256.Create())
+			using (var f = File.OpenRead(path))
+				return Web.Hex(h.ComputeHash(f));
 		}
 	}
 
@@ -554,17 +639,28 @@ namespace EldoUI.Updater.Tests
 	{
 		const string Latest = "https://api.github.com/repos/Eldodeldo/EldoUI/releases?per_page=10";
 
-		static (FakeWeb web, string url) Serve(TempDir t, string version, bool goodSha = true)
+		/// <summary>How a served release vouches for its zip.</summary>
+		public enum Proof { Digest, WrongDigest, None, ChecksumFile, WrongChecksumFile }
+
+		static (FakeWeb web, string url) Serve(TempDir t, string version, Proof proof = Proof.Digest)
 		{
 			var web = new FakeWeb();
 			string zip = Zips.Make(t.Path, version, "EldoUI", "EldoUI_LootData");
-			string url = "https://github.com/Eldodeldo/EldoUI/releases/download/v" + version + "/EldoUI-" + version + ".zip";
-			string sha;
-			using (var h = SHA256.Create())
-			using (var f = File.OpenRead(zip))
-				sha = Web.Hex(h.ComputeHash(f));
+			string baseUrl = "https://github.com/Eldodeldo/EldoUI/releases/download/v" + version + "/";
+			string url = baseUrl + "EldoUI-" + version + ".zip";
+			string sha = FakeWeb.Sha(zip);
 			web.Files[url] = zip;
-			web.Api[Latest] = "[" + FakeWeb.ReleaseJson(version, url, new FileInfo(zip).Length, goodSha ? sha : new string('0', 64)) + "]";
+			string digest = proof == Proof.Digest ? sha : proof == Proof.WrongDigest ? new string('0', 64) : null;
+			var more = new List<string>();
+			if (proof == Proof.ChecksumFile || proof == Proof.WrongChecksumFile)
+			{
+				string sums = Path.Combine(t.Path, "SHA256SUMS-" + Guid.NewGuid().ToString("N").Substring(0, 6) + ".txt");
+				File.WriteAllText(sums, new string('1', 64) + "  EldoUI-Updater.exe\n"
+					+ (proof == Proof.ChecksumFile ? sha : new string('0', 64)) + "  EldoUI-" + version + ".zip\n");
+				web.Files[baseUrl + "SHA256SUMS.txt"] = sums;
+				more.Add(FakeWeb.AssetJson("SHA256SUMS.txt", baseUrl + "SHA256SUMS.txt", new FileInfo(sums).Length, null));
+			}
+			web.Api[Latest] = "[" + FakeWeb.ReleaseJson(version, url, new FileInfo(zip).Length, digest, more.ToArray()) + "]";
 			return (web, url);
 		}
 
@@ -614,12 +710,138 @@ namespace EldoUI.Updater.Tests
 		{
 			using (var t = new TempDir())
 			{
-				var (web, _) = Serve(t, "0.7.0002", goodSha: false);
+				var (web, _) = Serve(t, "0.7.0002", Proof.WrongDigest);
 				var s = With(t);
 				var r = await new UpdateEngine(web, t.Sub("tmp"), null).CheckAsync(s, false, CancellationToken.None);
-				Assert.Equal(CheckOutcome.Failed, r.Outcome);
+				Assert.Equal(CheckOutcome.Unverified, r.Outcome);
 				Assert.Contains("checksum", r.Error);
 				Assert.Null(AddonInstaller.InstalledVersion(s.AddOnsDir));
+			}
+		}
+
+		/// <summary>An AddOns folder with EldoUI 0.7.0001 installed by the updater, another addon, and an EldoUI folder the updater did not install.</summary>
+		static Settings WithOldInstall(TempDir t)
+		{
+			var s = With(t);
+			var first = AddonInstaller.Install(Zips.Make(t.Path, "0.7.0001", "EldoUI"), s.AddOnsDir, null);
+			s.InstalledFolders = first.Folders.ToList();
+			Directory.CreateDirectory(Path.Combine(s.AddOnsDir, "OtherAddon"));
+			File.WriteAllText(Path.Combine(s.AddOnsDir, "OtherAddon", "OtherAddon.toc"), "other");
+			Directory.CreateDirectory(Path.Combine(s.AddOnsDir, "EldoUI_Custom"));
+			File.WriteAllText(Path.Combine(s.AddOnsDir, "EldoUI_Custom", "EldoUI_Custom.toc"), "custom");
+			return s;
+		}
+
+		static string Snapshot(string addOns)
+		{
+			return string.Join("\n", Directory.GetFiles(addOns, "*", SearchOption.AllDirectories).OrderBy(f => f, StringComparer.Ordinal)
+				.Select(f => f.Substring(addOns.Length) + "=" + FakeWeb.Sha(f)));
+		}
+
+		[Fact]
+		public async Task RefusesAReleaseWithoutAnyChecksumAndChangesNothing()
+		{
+			using (var t = new TempDir())
+			{
+				var (web, _) = Serve(t, "0.7.0002", Proof.None);
+				var s = WithOldInstall(t);
+				string before = Snapshot(s.AddOnsDir);
+				var r = await new UpdateEngine(web, t.Sub("tmp"), null).CheckAsync(s, false, CancellationToken.None);
+				Assert.Equal(CheckOutcome.Unverified, r.Outcome);
+				Assert.Equal("0.7.0002", r.Latest);
+				Assert.Contains("no published checksum", r.Error);
+				Assert.Equal(0, web.Downloads);
+				Assert.Equal(before, Snapshot(s.AddOnsDir));
+				Assert.Equal(new[] { "EldoUI" }, s.InstalledFolders);
+				Assert.Empty(Directory.GetFiles(t.Sub("tmp")));
+			}
+		}
+
+		[Fact]
+		public async Task UsesAChecksumFileWhenGitHubHasNoDigest()
+		{
+			using (var t = new TempDir())
+			{
+				var (web, _) = Serve(t, "0.7.0002", Proof.ChecksumFile);
+				var s = With(t);
+				var r = await new UpdateEngine(web, t.Sub("tmp"), null).CheckAsync(s, false, CancellationToken.None);
+				Assert.Equal(CheckOutcome.Installed, r.Outcome);
+				Assert.Equal("0.7.0002", AddonInstaller.InstalledVersion(s.AddOnsDir));
+				Assert.Empty(Directory.GetFiles(t.Sub("tmp")));
+			}
+		}
+
+		[Fact]
+		public async Task RefusesAZipThatDiffersFromItsChecksumFile()
+		{
+			using (var t = new TempDir())
+			{
+				var (web, _) = Serve(t, "0.7.0002", Proof.WrongChecksumFile);
+				var s = WithOldInstall(t);
+				string before = Snapshot(s.AddOnsDir);
+				var r = await new UpdateEngine(web, t.Sub("tmp"), null).CheckAsync(s, false, CancellationToken.None);
+				Assert.Equal(CheckOutcome.Unverified, r.Outcome);
+				Assert.Equal(before, Snapshot(s.AddOnsDir));
+				Assert.Empty(Directory.GetFiles(t.Sub("tmp")));
+			}
+		}
+
+		[Fact]
+		public async Task TriesAgainAtTheNextCheck()
+		{
+			using (var t = new TempDir())
+			{
+				var (web, url) = Serve(t, "0.7.0002", Proof.None);
+				var s = WithOldInstall(t);
+				var engine = new UpdateEngine(web, t.Sub("tmp"), null);
+				Assert.Equal(CheckOutcome.Unverified, (await engine.CheckAsync(s, false, CancellationToken.None)).Outcome);
+				web.Api[Latest] = "[" + FakeWeb.ReleaseJson("0.7.0002", url, new FileInfo(web.Files[url]).Length, FakeWeb.Sha(web.Files[url])) + "]";
+				Assert.Equal(CheckOutcome.Installed, (await engine.CheckAsync(s, false, CancellationToken.None)).Outcome);
+			}
+		}
+
+		[Fact]
+		public async Task AnUpdateTouchesOnlyEldoUIsOwnFolders()
+		{
+			using (var t = new TempDir())
+			{
+				var (web, _) = Serve(t, "0.7.0002");
+				var s = WithOldInstall(t);
+				var r = await new UpdateEngine(web, t.Sub("tmp"), null).CheckAsync(s, false, CancellationToken.None);
+				Assert.Equal(CheckOutcome.Installed, r.Outcome);
+				Assert.Equal("other", File.ReadAllText(Path.Combine(s.AddOnsDir, "OtherAddon", "OtherAddon.toc")));
+				Assert.Equal("custom", File.ReadAllText(Path.Combine(s.AddOnsDir, "EldoUI_Custom", "EldoUI_Custom.toc")));
+				Assert.Equal(new[] { "EldoUI", "EldoUI_LootData" }, s.InstalledFolders);
+				Assert.Equal(new[] { "EldoUI", "EldoUI_Custom", "EldoUI_LootData", "OtherAddon" },
+					Directory.GetDirectories(s.AddOnsDir).Select(Path.GetFileName).OrderBy(n => n, StringComparer.Ordinal));
+			}
+		}
+
+		[Fact]
+		public async Task ReplacesAPreReleaseWithTheSameRelease()
+		{
+			using (var t = new TempDir())
+			{
+				var (web, _) = Serve(t, "0.7.0002");
+				var s = With(t);
+				AddonInstaller.Install(Zips.Make(t.Path, "0.7.0002-beta.1a2b3c4", "EldoUI"), s.AddOnsDir, null);
+				var r = await new UpdateEngine(web, t.Sub("tmp"), null).CheckAsync(s, false, CancellationToken.None);
+				Assert.Equal(CheckOutcome.Installed, r.Outcome);
+				Assert.Equal("0.7.0002", AddonInstaller.InstalledVersion(s.AddOnsDir));
+			}
+		}
+
+		[Fact]
+		public async Task KeepsANewerPreRelease()
+		{
+			using (var t = new TempDir())
+			{
+				var (web, _) = Serve(t, "0.7.0002");
+				var s = With(t);
+				AddonInstaller.Install(Zips.Make(t.Path, "0.7.0003-beta.1a2b3c4", "EldoUI"), s.AddOnsDir, null);
+				var r = await new UpdateEngine(web, t.Sub("tmp"), null).CheckAsync(s, false, CancellationToken.None);
+				Assert.Equal(CheckOutcome.UpToDate, r.Outcome);
+				Assert.Equal(0, web.Downloads);
 			}
 		}
 
@@ -688,6 +910,30 @@ namespace EldoUI.Updater.Tests
 				Assert.NotNull(await engine.NewerUpdaterAsync("1.0.0", CancellationToken.None));
 				Assert.Null(await engine.NewerUpdaterAsync("1.1.0", CancellationToken.None));
 				Assert.Null(await new UpdateEngine(new FakeWeb(), t.Sub("tmp"), null).NewerUpdaterAsync("1.0.0", CancellationToken.None));
+			}
+		}
+
+		[Fact]
+		public async Task TheAppsOwnUpdateNeedsATrustedChecksumToo()
+		{
+			using (var t = new TempDir())
+			{
+				string exe = Path.Combine(t.Path, "new.exe");
+				File.WriteAllText(exe, "new updater");
+				string sums = Path.Combine(t.Path, "SHA256SUMS.txt");
+				File.WriteAllText(sums, FakeWeb.Sha(exe) + "  EldoUI-Updater.exe\r\n");
+				const string Base = "https://github.com/Eldodeldo/EldoUI-updater-app/releases/download/v9.0.0/";
+				var web = new FakeWeb();
+				web.Files[Base + "EldoUI-Updater.exe"] = exe;
+				web.Files[Base + "SHA256SUMS.txt"] = sums;
+				var withSums = Release.FromGitHub("{\"tag_name\":\"v9.0.0\",\"assets\":[" + FakeWeb.AssetJson("EldoUI-Updater.exe", Base + "EldoUI-Updater.exe", 11, null)
+					+ "," + FakeWeb.AssetJson("SHA256SUMS.txt", Base + "SHA256SUMS.txt", new FileInfo(sums).Length, null) + "]}");
+				var bare = Release.FromGitHub("{\"tag_name\":\"v9.0.0\",\"assets\":[" + FakeWeb.AssetJson("EldoUI-Updater.exe", Base + "EldoUI-Updater.exe", 11, null) + "]}");
+				var engine = new UpdateEngine(web, t.Sub("tmp"), null);
+
+				Assert.Equal(FakeWeb.Sha(exe), await engine.DownloadUpdaterAsync(withSums, t.Sub("a.exe"), CancellationToken.None));
+				await Assert.ThrowsAsync<UnverifiedDownload>(() => engine.DownloadUpdaterAsync(bare, t.Sub("b.exe"), CancellationToken.None));
+				Assert.False(File.Exists(t.Sub("b.exe")));
 			}
 		}
 	}
