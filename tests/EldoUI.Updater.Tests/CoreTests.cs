@@ -290,6 +290,65 @@ namespace EldoUI.Updater.Tests
 		}
 
 		[Fact]
+		public void TheReleasedGameWinsOverTheBetaWherever()
+		{
+			using (var t = new TempDir())
+			{
+				string beta = t.Sub("C", "Program Files (x86)", "World of Warcraft");
+				string game = t.Sub("D", "Spil", "WoW");
+				Directory.CreateDirectory(Path.Combine(beta, "_classic_beta_"));
+				Directory.CreateDirectory(Path.Combine(game, "_forever_"));
+				Assert.Equal(Path.Combine(game, "_forever_", "Interface", "AddOns"), WowFolders.Find(new[] { beta, game }));
+				Assert.Equal(Path.Combine(beta, "_classic_beta_", "Interface", "AddOns"), WowFolders.Find(new[] { beta }));
+			}
+		}
+
+		[Fact]
+		public void MovesFromTheBetaToTheReleasedGameBesideIt()
+		{
+			using (var t = new TempDir())
+			{
+				string root = t.Sub("World of Warcraft");
+				string beta = Path.Combine(root, "_classic_beta_", "Interface", "AddOns");
+				Directory.CreateDirectory(beta);
+				Assert.Equal(1, WowFolders.Rank(beta));
+				Assert.Null(WowFolders.Better(beta));
+				Directory.CreateDirectory(Path.Combine(root, "_forever_"));
+				string game = Path.Combine(root, "_forever_", "Interface", "AddOns");
+				Assert.Equal(game, WowFolders.Better(beta));
+				Assert.Equal(0, WowFolders.Rank(game));
+				Assert.Null(WowFolders.Better(game));
+				Assert.Equal(game, WowFolders.ResolveAddOns(root));
+			}
+		}
+
+		[Fact]
+		public void ReadsBattleNetsInstallFolder()
+		{
+			var dirs = WowFolders.FromBattleNetConfig("{\"Client\":{\"Install\":{\"DefaultInstallPath\":\"E:\\\\Games\\\\\"}}}").ToList();
+			Assert.Contains(Path.Combine(@"E:\Games\", "World of Warcraft"), dirs);
+			Assert.Empty(WowFolders.FromBattleNetConfig("{}"));
+			Assert.Empty(WowFolders.FromBattleNetConfig("not json"));
+		}
+
+		[Fact]
+		public void ReadsInstalledGamesFromProductDb()
+		{
+			// Paths sit between binary bytes; the byte after one can be a printable letter.
+			var bytes = new List<byte> { 0x0a, 0x10 };
+			bytes.AddRange(Encoding.UTF8.GetBytes("wow_forever"));
+			bytes.AddRange(new byte[] { 0x12, 0x15 });
+			bytes.AddRange(Encoding.UTF8.GetBytes("F:/Mine spil/World of Warcraft"));
+			bytes.AddRange(new byte[] { 0x32, 0x05, 0x00 });
+			bytes.AddRange(Encoding.UTF8.GetBytes("C:/Program Files (x86)/Diablo IV"));
+			bytes.Add(0x1a);
+			var dirs = WowFolders.FromProductDb(bytes.ToArray()).ToList();
+			Assert.Contains(@"F:\Mine spil\World of Warcraft", dirs);
+			Assert.Contains(@"C:\Program Files (x86)\Diablo IV", dirs);
+			Assert.Empty(WowFolders.FromProductDb(null));
+		}
+
+		[Fact]
 		public void FindsNothingWithoutForever()
 		{
 			using (var t = new TempDir())
