@@ -1,0 +1,142 @@
+name: build
+
+# Every pull request and every push to main: unit tests, the Windows build, the self-test on the real
+# .NET Framework and pictures of the window (artifact "snapshots").
+# A push to main whose <Version> in the project file is newer than the newest release also publishes it:
+# the release is made as a draft, gets the exe and its checksum, and is only then published, so the
+# updater never sees a half-finished release.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: Test and build (Windows)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Version
+        id: version
+        run: |
+          $xml = [xml](Get-Content src/EldoUI.Updater/EldoUI.Updater.csproj)
+          $v = ($xml.Project.PropertyGroup | ForEach-Object { $_.Version } | Where-Object { $_ }) | Select-Object -First 1
+          if ($v -notmatch '^\d+\.\d+\.\d+$') { throw "Version in the project file must be x.y.z, got '$v'" }
+          "version=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "Version $v"
+
+      - name: Unit tests
+        run: dotnet test tests/EldoUI.Updater.Tests -c Release --nologo
+
+      - name: Build the exe
+        run: dotnet build src/EldoUI.Updater -c Release --nologo
+
+      - name: Self-test on .NET Framework
+        run: |
+          $exe = "src/EldoUI.Updater/bin/Release/net48/EldoUI Updater.exe"
+          $p = Start-Process $exe -ArgumentList "--selftest" -Wait -PassThru -RedirectStandardOutput selftest.txt
+          Get-Content selftest.txt
+          if ($p.ExitCode -ne 0) { throw "self-test failed ($($p.ExitCode))" }
+
+      - name: Pictures of the window
+        timeout-minutes: 5
+        run: |
+          $exe = "src/EldoUI.Updater/bin/Release/net48/EldoUI Updater.exe"
+          $p = Start-Process $exe -ArgumentList "--snapshot", "snapshots" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "snapshot failed ($($p.ExitCode))" }
+          Get-ChildItem snapshots | Format-Table Name, Length
+
+      - name: Stage the release file
+        run: |
+          New-Item -ItemType Directory -Force publish | Out-Null
+          Copy-Item "src/EldoUI.Updater/bin/Release/net48/EldoUI Updater.exe" publish/EldoUI-Updater.exe
+          $hash = (Get-FileHash publish/EldoUI-Updater.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  EldoUI-Updater.exe" | Out-File -Encoding ascii publish/SHA256SUMS.txt
+          Get-Content publish/SHA256SUMS.txt
+          Write-Host "Size: $((Get-Item publish/EldoUI-Updater.exe).Length) bytes"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: snapshots
+          path: snapshots/*.png
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EldoUI-Updater
+          path: publish/*
+          retention-days: 14
+
+  release:
+    name: Publish ${{ needs.build.outputs.version }}
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.build.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Only a version newer than the newest release
+        id: guard
+        run: |
+          latest=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName 2>/dev/null || true)
+          latest="${latest#v}"
+          echo "Newest release: ${latest:-none}, this build: $VERSION"
+          if [ -n "$latest" ] && [ "$(printf '%s\n%s\n' "$latest" "$VERSION" | sort -V | tail -1)" = "$latest" ]; then
+            echo "Not newer: nothing to publish (raise <Version> in the project file to release)."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/download-artifact@v4
+        if: steps.guard.outputs.publish == 'true'
+        with:
+          name: EldoUI-Updater
+          path: publish
+
+      - name: Release notes
+        if: steps.guard.outputs.publish == 'true'
+        run: |
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" { on = 1; next }
+            on && /^## \[/ { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then echo "CHANGELOG.md has no section for $VERSION"; exit 1; fi
+          cat notes.md
+
+      - name: Draft, upload, then publish
+        if: steps.guard.outputs.publish == 'true'
+        run: |
+          # A draft left by an earlier failed try of this version starts over; a published release is never deleted.
+          if [ "$(gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" --json isDraft -q .isDraft 2>/dev/null)" = "true" ]; then
+            gh release delete "v$VERSION" --repo "$GITHUB_REPOSITORY" --yes
+          fi
+          gh release create "v$VERSION" --repo "$GITHUB_REPOSITORY" --draft \
+            --title "EldoUI Updater $VERSION" --notes-file notes.md --target "$GITHUB_SHA" \
+            publish/EldoUI-Updater.exe publish/SHA256SUMS.txt
+          gh release edit "v$VERSION" --repo "$GITHUB_REPOSITORY" --draft=false --latest
