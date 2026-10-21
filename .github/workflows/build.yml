@@ -29,9 +29,9 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 8.0.x
 
@@ -74,13 +74,13 @@ jobs:
           Get-Content publish/SHA256SUMS.txt
           Write-Host "Size: $((Get-Item publish/EldoUI-Updater.exe).Length) bytes"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: snapshots
           path: snapshots/*.png
           retention-days: 14
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: EldoUI-Updater
           path: publish/*
@@ -97,7 +97,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       VERSION: ${{ needs.build.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Only a version newer than the newest release
         id: guard
