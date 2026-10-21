@@ -252,11 +252,12 @@ namespace EldoUI.Updater
 					}
 					break;
 				case CheckOutcome.Failed:
+				case CheckOutcome.Unverified:
 					if (!user && r.Latest != null && r.Latest != _settings.AnnouncedVersion)
 					{
 						_settings.AnnouncedVersion = r.Latest;
 						Save();
-						Toast(T.S("toast.failed.title"), T.S("state.failed"), ToolTipIcon.Warning, "open");
+						Toast(T.S("toast.failed.title"), r.Outcome == CheckOutcome.Unverified ? T.F("state.unverified", r.Latest) : T.S("state.failed"), ToolTipIcon.Warning, "open");
 					}
 					break;
 			}
@@ -302,6 +303,8 @@ namespace EldoUI.Updater
 						v.Kind = StatusKind.Warn; v.Status = T.S("state.offline"); break;
 					case CheckOutcome.NoDownload:
 						v.Kind = StatusKind.Info; v.Status = T.S("state.nodownload"); break;
+					case CheckOutcome.Unverified:
+						v.Kind = StatusKind.Error; v.Status = T.F("state.unverified", r.Latest); break;
 					case CheckOutcome.NoFolder:
 						v.Kind = StatusKind.Warn; v.Status = T.S("state.nofolder"); v.Action = MainAction.ChooseFolder; break;
 					default:

@@ -18,6 +18,11 @@ namespace EldoUI.Updater.Core
 		/// <summary>A newer EldoUI is out and waits for the player (automatic install is off).</summary>
 		UpdateAvailable,
 		Installed,
+		/// <summary>
+		/// The newest EldoUI could not be matched to a trusted SHA-256 (none published, or a different file arrived).
+		/// Nothing was changed; the next check tries again.
+		/// </summary>
+		Unverified,
 		Offline,
 		Failed,
 	}
@@ -42,6 +47,7 @@ namespace EldoUI.Updater.Core
 		public const string LinuxUpdaterAssetPattern = @"^EldoUI-Updater-x86_64\.AppImage$";
 		const long MaxAddonZip = 200L * 1024 * 1024;
 		const long MaxUpdaterFile = 200L * 1024 * 1024;
+		const long MaxChecksumFile = 64L * 1024;
 
 		readonly IWeb _web;
 		readonly string _apiBase;
@@ -107,6 +113,11 @@ namespace EldoUI.Updater.Core
 					r.Outcome = CheckOutcome.Installed;
 					return r;
 				}
+				catch (UnverifiedDownload ex)
+				{
+					r.Outcome = CheckOutcome.Unverified;
+					r.Error = ex.Message;
+				}
 				catch (HttpRequestException ex)
 				{
 					r.Outcome = CheckOutcome.Offline;
@@ -144,7 +155,7 @@ namespace EldoUI.Updater.Core
 			try
 			{
 				_log("Downloading " + asset.Name);
-				string sha = await DownloadCheckedAsync(asset, zip, MaxAddonZip, ct).ConfigureAwait(false);
+				string sha = await DownloadCheckedAsync(release, asset, zip, MaxAddonZip, ct).ConfigureAwait(false);
 				var result = AddonInstaller.Install(zip, settings.AddOnsDir, settings.InstalledFolders);
 				settings.InstalledFolders = result.Folders.ToList();
 				_log("Installed EldoUI " + (result.Version ?? release.Version) + " (" + string.Join(", ", result.Folders) + "), sha256 " + sha
@@ -157,16 +168,58 @@ namespace EldoUI.Updater.Core
 			}
 		}
 
-		/// <summary>Downloads an asset and checks its size and GitHub's SHA-256 (when GitHub has one). Returns the SHA-256.</summary>
-		public async Task<string> DownloadCheckedAsync(ReleaseAsset asset, string target, long maxBytes, CancellationToken ct)
+		/// <summary>
+		/// Downloads an asset of a release and checks its size and SHA-256 against a trusted value (see TrustedSha256Async).
+		/// Throws UnverifiedDownload when there is no trusted value or the file does not match it. Returns the SHA-256.
+		/// </summary>
+		public async Task<string> DownloadCheckedAsync(Release release, ReleaseAsset asset, string target, long maxBytes, CancellationToken ct)
 		{
+			// Without a trusted checksum the file is not even downloaded.
+			string trusted = await TrustedSha256Async(release, asset, ct).ConfigureAwait(false);
+			if (trusted == null)
+				throw new UnverifiedDownload(asset.Name + " has no published checksum, so it was not installed.");
 			string sha = await _web.DownloadAsync(asset.Url, target, maxBytes, ct).ConfigureAwait(false);
 			long size = new FileInfo(target).Length;
 			if (asset.Size > 0 && size != asset.Size)
 				throw new InvalidDataException("The download has the wrong size (" + size + " bytes, expected " + asset.Size + ").");
-			if (asset.Sha256 != null && !string.Equals(sha, asset.Sha256, StringComparison.OrdinalIgnoreCase))
-				throw new InvalidDataException("The download does not match GitHub's checksum.");
+			if (!string.Equals(sha, trusted, StringComparison.OrdinalIgnoreCase))
+				throw new UnverifiedDownload(asset.Name + " does not match its published checksum, so it was not installed.");
 			return sha;
+		}
+
+		/// <summary>
+		/// The SHA-256 the release publishes for the asset: GitHub's digest of the uploaded file, or else its line in
+		/// a checksum file of the same release ("&lt;name&gt;.sha256" or "SHA256SUMS.txt"). Null when there is neither.
+		/// </summary>
+		public async Task<string> TrustedSha256Async(Release release, ReleaseAsset asset, CancellationToken ct)
+		{
+			if (asset == null) return null;
+			if (asset.Sha256 != null) return asset.Sha256;
+			if (release == null) return null;
+			var files = release.Assets.Where(a => Release.IsChecksumFileFor(a, asset))
+				.OrderBy(a => a.Name.EndsWith(".sha256", StringComparison.OrdinalIgnoreCase) ? 0 : 1).ToList();
+			if (files.Count == 0) return null;
+			Directory.CreateDirectory(_tempDir);
+			foreach (var file in files)
+			{
+				string path = Path.Combine(_tempDir, "checksums-" + Guid.NewGuid().ToString("N").Substring(0, 8) + ".txt");
+				try
+				{
+					await _web.DownloadAsync(file.Url, path, MaxChecksumFile, ct).ConfigureAwait(false);
+					bool single = file.Name.EndsWith(".sha256", StringComparison.OrdinalIgnoreCase);
+					string sha = Checksums.Find(File.ReadAllText(path), asset.Name, single);
+					if (sha != null)
+					{
+						_log("Checksum for " + asset.Name + " read from " + file.Name);
+						return sha;
+					}
+				}
+				finally
+				{
+					try { File.Delete(path); } catch { }
+				}
+			}
+			return null;
 		}
 
 		/// <summary>
@@ -189,7 +242,13 @@ namespace EldoUI.Updater.Core
 
 		public Task<string> DownloadUpdaterAsync(Release r, string target, CancellationToken ct, string assetPattern = UpdaterAssetPattern)
 		{
-			return DownloadCheckedAsync(r.Find(assetPattern), target, MaxUpdaterFile, ct);
+			return DownloadCheckedAsync(r, r.Find(assetPattern), target, MaxUpdaterFile, ct);
 		}
+	}
+
+	/// <summary>A download that has no trusted SHA-256, or does not match it. Nothing is installed from it.</summary>
+	public sealed class UnverifiedDownload : Exception
+	{
+		public UnverifiedDownload(string message) : base(message) { }
 	}
 }
