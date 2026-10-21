@@ -2,6 +2,12 @@
 
 Each release of the EldoUI Updater. The newest is at the top.
 
+## [1.0.3] - 2026-10-21
+
+### Improved
+- Finds the released WoW: Forever (its `_forever_` folder) wherever it is installed, and still the beta's `_classic_beta_` folder. It asks Battle.net where your games are before looking in the usual places on every drive.
+- When the released game appears, the updater moves from the beta folder to it by itself and installs EldoUI there.
+
 ## [1.0.2] - 2026-10-21
 
 ### New
