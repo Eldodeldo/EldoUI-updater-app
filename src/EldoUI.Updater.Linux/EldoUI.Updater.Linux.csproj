@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The Linux app: .NET 8 with Avalonia, published as one self-contained file and wrapped in an AppImage
+    (packaging/linux/build-appimage.sh). It shares src/Core and the texts with the Windows app, so
+    checking, downloading and installing EldoUI is the same tested code on both.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>EldoUI.Updater</RootNamespace>
+    <AssemblyName>eldoui-updater</AssemblyName>
+    <Product>EldoUI Updater</Product>
+    <Company>Eldodeldo</Company>
+    <Authors>Eldodeldo</Authors>
+    <Description>Keeps EldoUI up to date for WoW: Forever</Description>
+    <Copyright>Copyright 2026 Eldodeldo</Copyright>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <DebugType>embedded</DebugType>
+    <Deterministic>true</Deterministic>
+    <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\Core\*.cs" Link="Core\%(Filename)%(Extension)" />
+    <Compile Include="..\EldoUI.Updater\Strings.cs" Link="Shared\Strings.cs" />
+    <EmbeddedResource Include="Assets\logo.png" />
+    <!-- Linux only: the analyzer then accepts Unix-only calls such as file modes. -->
+    <AssemblyAttribute Include="System.Runtime.Versioning.SupportedOSPlatformAttribute">
+      <_Parameter1>linux</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.2.3" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.2.3" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.3" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.2.3" />
+    <PackageReference Include="Avalonia.Headless" Version="11.2.3" />
+  </ItemGroup>
+</Project>

@@ -4,3 +4,4 @@ obj/
 .vs/
 snapshots/
 publish/
+packaging/linux/.work/

@@ -407,6 +407,82 @@ namespace EldoUI.Updater.Tests
 		}
 	}
 
+	/// <summary>A test that only means something on Linux (it is reported as skipped elsewhere).</summary>
+	public sealed class LinuxFactAttribute : FactAttribute
+	{
+		public LinuxFactAttribute()
+		{
+			if (!OperatingSystem.IsLinux()) Skip = "Linux only";
+		}
+	}
+
+	public class WineFolderTests
+	{
+		[Fact]
+		public void MapsWindowsPathsIntoThePrefix()
+		{
+			Assert.Equal(Path.Combine("/p", "drive_c", "Program Files (x86)/World of Warcraft"), WineFolders.ToUnix("/p", @"C:\Program Files (x86)\World of Warcraft\"));
+			Assert.Equal(Path.Combine("/p", "dosdevices", "d:", "Spil/WoW"), WineFolders.ToUnix("/p", "D:/Spil//WoW"));
+			Assert.Equal(Path.Combine("/p", "drive_c"), WineFolders.ToUnix("/p", @"c:\"));
+			Assert.Null(WineFolders.ToUnix("/p", "relative/path"));
+		}
+
+		[Fact]
+		public void ReadsLutrisAndSteamFiles()
+		{
+			var lutris = WineFolders.LutrisPrefixes("game:\n  exe: x.exe\n  prefix: ~/Games/battlenet\nwine:\n  prefix: '/mnt/ssd/wow'\n", "/home/me").ToList();
+			Assert.Equal(new[] { Path.Combine("/home/me", "Games/battlenet"), "/mnt/ssd/wow" }, lutris);
+			var libs = WineFolders.VdfLibraryPaths("\"libraryfolders\"\n{\n \"0\"\n {\n  \"path\"\t\t\"/home/me/.local/share/Steam\"\n }\n \"1\"\n {\n  \"path\"\t\t\"/mnt/games/SteamLibrary\"\n }\n}").ToList();
+			Assert.Equal(new[] { "/home/me/.local/share/Steam", "/mnt/games/SteamLibrary" }, libs);
+		}
+
+		[Fact]
+		public void FindsForeverInLutrisBottlesAndProton()
+		{
+			using (var t = new TempDir())
+			{
+				string home = t.Path;
+				// A Bottles bottle with only the beta, and a Proton prefix with the released game.
+				Directory.CreateDirectory(t.Sub(".local/share/bottles/bottles/Battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_beta_"));
+				string proton = t.Sub(".steam/steam/steamapps/compatdata/123456/pfx");
+				Directory.CreateDirectory(Path.Combine(proton, "drive_c/Program Files (x86)/World of Warcraft/_forever_"));
+				string want = Path.Combine(proton, "drive_c/Program Files (x86)/World of Warcraft/_forever_", "Interface", "AddOns");
+				Assert.Equal(Path.GetFullPath(want), Path.GetFullPath(WineFolders.Find(home)));
+			}
+		}
+
+		// Wine's dosdevices\d: is a Linux symlink; Windows cannot even name a file "d:". The Linux CI job runs it.
+		[LinuxFact]
+		public void FollowsBattleNetInsideThePrefixToAnotherDrive()
+		{
+			using (var t = new TempDir())
+			{
+				string prefix = t.Sub("Games", "battlenet");
+				string roaming = Path.Combine(prefix, "drive_c/users/steamuser/AppData/Roaming/Battle.net");
+				Directory.CreateDirectory(roaming);
+				File.WriteAllText(Path.Combine(roaming, "Battle.net.config"), "{\"Client\":{\"Install\":{\"DefaultInstallPath\":\"D:\\\\Spil\"}}}");
+				// D: is a folder elsewhere, linked the way Wine does it.
+				string dDrive = t.Sub("ssd");
+				Directory.CreateDirectory(Path.Combine(dDrive, "Spil/World of Warcraft/_forever_"));
+				Directory.CreateDirectory(Path.Combine(prefix, "dosdevices"));
+				File.CreateSymbolicLink(Path.Combine(prefix, "dosdevices", "d:"), dDrive);
+				string found = WineFolders.Find(t.Path);
+				Assert.Equal(Path.Combine(prefix, "dosdevices", "d:", "Spil", "World of Warcraft", "_forever_", "Interface", "AddOns"), found);
+			}
+		}
+
+		[Fact]
+		public void NoPrefixFindsNothing()
+		{
+			using (var t = new TempDir())
+			{
+				Directory.CreateDirectory(t.Sub("Games", "notaprefix"));
+				Assert.Empty(WineFolders.Prefixes(t.Path));
+				Assert.Null(WineFolders.Find(t.Path));
+			}
+		}
+	}
+
 	public class SettingsTests
 	{
 		[Fact]
