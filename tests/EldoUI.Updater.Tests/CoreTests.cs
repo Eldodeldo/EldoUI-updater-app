@@ -300,6 +300,54 @@ namespace EldoUI.Updater.Tests
 		}
 	}
 
+	public class SelfUpdatePolicyTests
+	{
+		static readonly DateTime Now = new DateTime(2026, 10, 21, 20, 0, 0, DateTimeKind.Utc);
+
+		[Fact]
+		public void InstallsADayAfterItWasFirstSeen()
+		{
+			var s = new Settings();
+			var at = SelfUpdatePolicy.Note(s, "1.0.3", Now);
+			Assert.Equal(Now.AddHours(24), at);
+			Assert.False(SelfUpdatePolicy.Due(at, Now.AddHours(23)));
+			Assert.True(SelfUpdatePolicy.Due(at, Now.AddHours(24)));
+		}
+
+		[Fact]
+		public void SeeingTheSameVersionAgainKeepsTheWait()
+		{
+			var s = new Settings();
+			SelfUpdatePolicy.Note(s, "1.0.3", Now);
+			Assert.Equal(Now.AddHours(24), SelfUpdatePolicy.Note(s, "1.0.3", Now.AddHours(10)));
+		}
+
+		[Fact]
+		public void ANewerVersionStartsANewWait()
+		{
+			var s = new Settings();
+			SelfUpdatePolicy.Note(s, "1.0.3", Now);
+			Assert.Equal(Now.AddHours(34), SelfUpdatePolicy.Note(s, "1.0.4", Now.AddHours(10)));
+		}
+
+		[Fact]
+		public void TheWaitSurvivesARestart()
+		{
+			using (var t = new TempDir())
+			{
+				string path = t.Sub("settings.json");
+				var s = new Settings();
+				SelfUpdatePolicy.Note(s, "1.0.3", Now);
+				s.Save(path);
+				var back = Settings.Load(path);
+				Assert.Equal(Now.AddHours(24), SelfUpdatePolicy.Note(back, "1.0.3", Now.AddHours(5)));
+				Assert.True(SelfUpdatePolicy.Clear(back));
+				Assert.False(SelfUpdatePolicy.Clear(back));
+				Assert.Equal("", back.UpdaterSeenVersion);
+			}
+		}
+	}
+
 	public class SettingsTests
 	{
 		[Fact]

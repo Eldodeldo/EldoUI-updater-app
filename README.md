@@ -38,7 +38,7 @@ SHA-256 checksum in `SHA256SUMS.txt`.
 - Unpacks it next to AddOns, then swaps each folder in. If anything fails, the old folders are put back.
   A folder a new release no longer has is removed, but only if the updater installed it. Other addons
   and the game's `WTF` folder (your settings) are never touched.
-- Updates itself the same way from this repository's releases.
+- Updates itself from this repository's releases: a new version shows quietly in the window and menu (no pop-up) and installs itself 24 hours later, or at once with "Update now".
 
 Files on your PC:
 
