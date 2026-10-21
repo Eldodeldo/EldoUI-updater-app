@@ -21,20 +21,24 @@ namespace EldoUI.Updater
 		public bool Busy;
 		public bool Autostart;
 		public bool AutoInstall;
+		/// <summary>A newer version of the updater itself, when it installs by itself, and whether it is installing now.</summary>
+		public string AppNew;
+		public DateTime? AppAt;
+		public bool AppBusy;
 	}
 
 	sealed class MainForm : Form
 	{
-		public event Action CheckClicked, UpdateClicked, ChooseFolderClicked, OpenAddOnsClicked;
+		public event Action CheckClicked, UpdateClicked, ChooseFolderClicked, OpenAddOnsClicked, AppUpdateClicked;
 		public event Action<bool> AutostartChanged, AutoInstallChanged;
 		public bool AllowClose;
 
 		readonly Image _logo;
-		readonly Label _status, _installed, _latest, _folder, _checked, _footer;
-		readonly Label[] _labels = new Label[4];
+		readonly Label _status, _installed, _latest, _folder, _checked, _app, _appUpdate, _footer;
+		readonly Label[] _labels = new Label[5];
 		readonly ECheck _autostart, _autoInstall;
 		readonly EButton _primary, _chooseFolder, _openAddOns;
-		readonly Font _head, _tag, _body, _small;
+		readonly Font _head, _tag, _body, _small, _link;
 		readonly ToolTip _tips = new ToolTip();
 		ViewState _state = new ViewState();
 		bool _rendering;
@@ -46,6 +50,7 @@ namespace EldoUI.Updater
 			_tag = Theme.Body(9.5f);
 			_body = Theme.Body(9.75f);
 			_small = Theme.Body(8.25f);
+			_link = Theme.Body(9.75f, FontStyle.Underline);
 
 			SuspendLayout();
 			AutoScaleDimensions = new SizeF(96f, 96f);
@@ -55,7 +60,7 @@ namespace EldoUI.Updater
 			FormBorderStyle = FormBorderStyle.FixedSingle;
 			MaximizeBox = false;
 			StartPosition = FormStartPosition.CenterScreen;
-			ClientSize = new Size(470, 424);
+			ClientSize = new Size(470, 450);
 			BackColor = Theme.Panel;
 			ForeColor = Theme.Text;
 			Font = _body;
@@ -65,9 +70,9 @@ namespace EldoUI.Updater
 			_status = new Label { Location = new Point(42, 110), Size = new Size(408, 40), ForeColor = Theme.Text, Font = _body, BackColor = Color.Transparent };
 			Controls.Add(_status);
 
-			string[] keys = { "label.installed", "label.latest", "label.folder", "label.checked" };
-			var values = new Label[4];
-			for (int i = 0; i < 4; i++)
+			string[] keys = { "label.installed", "label.latest", "label.folder", "label.checked", "label.app" };
+			var values = new Label[5];
+			for (int i = 0; i < 5; i++)
 			{
 				int y = 162 + i * 26;
 				_labels[i] = new Label { Location = new Point(22, y), Size = new Size(118, 22), ForeColor = Theme.Muted, Font = _body, Tag = keys[i] };
@@ -79,17 +84,23 @@ namespace EldoUI.Updater
 			_latest = values[1];
 			_folder = values[2];
 			_checked = values[3];
+			_app = values[4];
+			// "Update now" beside the app's own version, shown only when a newer one is out.
+			_appUpdate = new Label { Location = new Point(340, 266), Size = new Size(110, 22), ForeColor = Theme.Accent, Font = _link, Cursor = Cursors.Hand, TextAlign = ContentAlignment.TopRight, Visible = false };
+			_appUpdate.Click += (s, e) => { if (AppUpdateClicked != null && !_state.AppBusy) AppUpdateClicked(); };
+			Controls.Add(_appUpdate);
+			_appUpdate.BringToFront();
 
-			_autostart = new ECheck { Location = new Point(22, 278), Size = new Size(428, 26) };
-			_autoInstall = new ECheck { Location = new Point(22, 306), Size = new Size(428, 26) };
+			_autostart = new ECheck { Location = new Point(22, 304), Size = new Size(428, 26) };
+			_autoInstall = new ECheck { Location = new Point(22, 332), Size = new Size(428, 26) };
 			_autostart.CheckedChanged += (s, e) => { if (!_rendering && AutostartChanged != null) AutostartChanged(_autostart.Checked); };
 			_autoInstall.CheckedChanged += (s, e) => { if (!_rendering && AutoInstallChanged != null) AutoInstallChanged(_autoInstall.Checked); };
 			Controls.Add(_autostart);
 			Controls.Add(_autoInstall);
 
-			_primary = new EButton { Primary = true, Location = new Point(22, 346), Size = new Size(156, 36) };
-			_chooseFolder = new EButton { Location = new Point(188, 346), Size = new Size(136, 36) };
-			_openAddOns = new EButton { Location = new Point(334, 346), Size = new Size(116, 36) };
+			_primary = new EButton { Primary = true, Location = new Point(22, 372), Size = new Size(156, 36) };
+			_chooseFolder = new EButton { Location = new Point(188, 372), Size = new Size(136, 36) };
+			_openAddOns = new EButton { Location = new Point(334, 372), Size = new Size(116, 36) };
 			_primary.Click += (s, e) => OnPrimary();
 			_chooseFolder.Click += (s, e) => { if (ChooseFolderClicked != null) ChooseFolderClicked(); };
 			_openAddOns.Click += (s, e) => { if (OpenAddOnsClicked != null) OpenAddOnsClicked(); };
@@ -97,7 +108,7 @@ namespace EldoUI.Updater
 			Controls.Add(_chooseFolder);
 			Controls.Add(_openAddOns);
 
-			_footer = new Label { Location = new Point(40, 394), Size = new Size(390, 20), ForeColor = Theme.Muted, Font = _small, TextAlign = ContentAlignment.MiddleCenter };
+			_footer = new Label { Location = new Point(40, 420), Size = new Size(390, 20), ForeColor = Theme.Muted, Font = _small, TextAlign = ContentAlignment.MiddleCenter };
 			Controls.Add(_footer);
 
 			AcceptButton = _primary;
@@ -160,6 +171,7 @@ namespace EldoUI.Updater
 			_autoInstall.Text = T.S("check.auto");
 			_chooseFolder.Text = T.S("btn.folder");
 			_openAddOns.Text = T.S("btn.addons");
+			_appUpdate.Text = T.S("btn.update");
 			_footer.Text = "v" + Setup.Version + " · " + T.S("footer");
 			Render(_state);
 		}
@@ -177,6 +189,10 @@ namespace EldoUI.Updater
 				_folder.ForeColor = string.IsNullOrEmpty(s.Folder) ? Theme.Warn : Theme.Text;
 				_tips.SetToolTip(_folder, s.Folder ?? "");
 				_checked.Text = Ago(s.LastCheck);
+				_app.Text = AppText(s);
+				_app.ForeColor = s.AppNew != null ? Theme.Accent : Theme.Text;
+				_app.Width = s.AppNew != null && !s.AppBusy ? 200 : 310;
+				_appUpdate.Visible = s.AppNew != null && !s.AppBusy;
 				_autostart.Checked = s.Autostart;
 				_autoInstall.Checked = s.AutoInstall;
 				_primary.Text = T.S(s.Action == MainAction.ChooseFolder ? "btn.folder"
@@ -191,6 +207,14 @@ namespace EldoUI.Updater
 			{
 				_rendering = false;
 			}
+		}
+
+		static string AppText(ViewState s)
+		{
+			if (s.AppNew == null) return T.F("value.app.current", Setup.Version);
+			if (s.AppBusy) return T.F("value.app.updating", s.AppNew);
+			double hours = s.AppAt.HasValue ? (s.AppAt.Value.ToUniversalTime() - DateTime.UtcNow).TotalHours : 0;
+			return hours >= 1 ? T.F("value.app.new", s.AppNew, (int)Math.Ceiling(hours)) : T.F("value.app.soon", s.AppNew);
 		}
 
 		static string Ago(DateTime? when)
@@ -250,7 +274,7 @@ namespace EldoUI.Updater
 			using (var pen = new Pen(Theme.Edge))
 			{
 				g.DrawLine(pen, 22 * k, 154 * k, ClientSize.Width - 22 * k, 154 * k);
-				g.DrawLine(pen, 22 * k, 270 * k, ClientSize.Width - 22 * k, 270 * k);
+				g.DrawLine(pen, 22 * k, 296 * k, ClientSize.Width - 22 * k, 296 * k);
 			}
 			Theme.Ornaments(g, ClientRectangle, k);
 			base.OnPaint(e);
@@ -264,6 +288,7 @@ namespace EldoUI.Updater
 				_head.Dispose();
 				_tag.Dispose();
 				_small.Dispose();
+				_link.Dispose();
 			}
 			base.Dispose(disposing);
 		}
