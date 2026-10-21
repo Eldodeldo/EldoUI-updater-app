@@ -2,6 +2,6 @@
   <!-- One version for both apps: raise it here to release. The release carries the Windows exe and the
        Linux AppImage of the same version. -->
   <PropertyGroup>
-    <Version>1.1.2</Version>
+    <Version>1.2.1</Version>
   </PropertyGroup>
 </Project>

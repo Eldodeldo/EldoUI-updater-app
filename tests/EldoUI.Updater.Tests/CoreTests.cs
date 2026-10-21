@@ -914,6 +914,34 @@ namespace EldoUI.Updater.Tests
 		}
 
 		[Fact]
+		public async Task ACheckForAnAppUpdateNamesEachOutcome()
+		{
+			using (var t = new TempDir())
+			{
+				var web = new FakeWeb();
+				web.Api["https://api.github.com/repos/Eldodeldo/EldoUI-updater-app/releases/latest"] =
+					"{\"tag_name\":\"v1.3.0\",\"assets\":[{\"name\":\"EldoUI-Updater.exe\",\"size\":5,\"browser_download_url\":\"https://github.com/Eldodeldo/EldoUI-updater-app/releases/download/v1.3.0/EldoUI-Updater.exe\"}]}";
+				var engine = new UpdateEngine(web, t.Sub("tmp"), null);
+
+				var newer = await engine.CheckUpdaterAsync("1.2.1", CancellationToken.None);
+				Assert.Equal(AppCheckOutcome.Newer, newer.Outcome);
+				Assert.Equal("1.3.0", newer.Release.Version);
+
+				Assert.Equal(AppCheckOutcome.UpToDate, (await engine.CheckUpdaterAsync("1.3.0", CancellationToken.None)).Outcome);
+				// A release without this platform's file is no update for it.
+				Assert.Equal(AppCheckOutcome.UpToDate, (await engine.CheckUpdaterAsync("1.2.1", CancellationToken.None, UpdateEngine.LinuxUpdaterAssetPattern)).Outcome);
+
+				// GitHub answers "not found" (no public release to see) or cannot be reached at all.
+				var none = await new UpdateEngine(new FakeWeb(), t.Sub("tmp"), null).CheckUpdaterAsync("1.2.1", CancellationToken.None);
+				Assert.Equal(AppCheckOutcome.Unreachable, none.Outcome);
+				Assert.NotNull(none.Error);
+				web.Fail = new System.Net.Http.HttpRequestException("no network");
+				Assert.Equal(AppCheckOutcome.Unreachable, (await engine.CheckUpdaterAsync("1.2.1", CancellationToken.None)).Outcome);
+				Assert.Null(await engine.NewerUpdaterAsync("1.2.1", CancellationToken.None));
+			}
+		}
+
+		[Fact]
 		public async Task TheAppsOwnUpdateNeedsATrustedChecksumToo()
 		{
 			using (var t = new TempDir())
@@ -935,6 +963,29 @@ namespace EldoUI.Updater.Tests
 				await Assert.ThrowsAsync<UnverifiedDownload>(() => engine.DownloadUpdaterAsync(bare, t.Sub("b.exe"), CancellationToken.None));
 				Assert.False(File.Exists(t.Sub("b.exe")));
 			}
+		}
+	}
+
+	public class BootCheckTests
+	{
+		static readonly DateTime Now = new DateTime(2026, 10, 22, 7, 0, 0, DateTimeKind.Utc);
+
+		[Fact]
+		public void ActiveAtStartUntilACheckReachesGitHub()
+		{
+			var b = new BootCheck(Now);
+			Assert.True(b.Active(Now));
+			Assert.True(b.Active(Now.AddMinutes(3)));
+			b.Finish();
+			Assert.False(b.Active(Now.AddMinutes(3)));
+		}
+
+		[Fact]
+		public void EndsAfterTenMinutesWithoutNetwork()
+		{
+			var b = new BootCheck(Now);
+			Assert.True(b.Active(Now.AddMinutes(9)));
+			Assert.False(b.Active(Now.AddMinutes(10)));
 		}
 	}
 }
