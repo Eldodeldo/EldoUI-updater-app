@@ -2,6 +2,14 @@
 
 Each release of the EldoUI Updater. The newest is at the top.
 
+## [1.0.2] - 2026-10-21
+
+### New
+- The updater keeps itself up to date too. A new version of the app shows quietly in the window ("This app") and in the menu, never as a pop-up, and installs itself 24 hours later. "Update now" in the window or menu installs it at once.
+
+### Improved
+- No notice after the app has updated itself; the window shows the version it runs.
+
 ## [1.0.1] - 2026-10-21
 
 ### Fixed

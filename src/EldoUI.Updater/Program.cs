@@ -2,7 +2,7 @@
 //
 //   (none)          first start from a download: install, then open the window
 //   --tray          start hidden in the tray (autostart uses this)
-//   --updated       started by a self-update (shows a short notice)
+//   --updated       started by a self-update (forgets the version it was waiting for)
 //   --uninstall     remove the updater (add --quiet to skip the question)
 //   --selftest      check the install logic in a temp folder and exit (CI)
 //   --snapshot DIR  save pictures of the window in both languages and exit (CI)

@@ -15,7 +15,6 @@ namespace EldoUI.Updater
 	sealed class TrayApp : ApplicationContext
 	{
 		static readonly TimeSpan CheckEvery = TimeSpan.FromHours(3);
-		static readonly TimeSpan SelfCheckEvery = TimeSpan.FromHours(24);
 		const string SiteUrl = "https://github.com/Eldodeldo/EldoUI";
 
 		readonly Settings _settings;
@@ -27,12 +26,15 @@ namespace EldoUI.Updater
 		readonly System.Windows.Forms.Timer _timer;
 		readonly SynchronizationContext _ui;
 		readonly ToolStripMenuItem _miStatus, _miAuto, _miStartup, _miLangAuto, _miLangEn, _miLangDa, _miNotes;
-		readonly ToolStripMenuItem _miOpen, _miCheck, _miFolder, _miAddOns, _miLang, _miSite, _miExit;
+		readonly ToolStripMenuItem _miOpen, _miCheck, _miSelf, _miFolder, _miAddOns, _miLang, _miSite, _miExit;
 		readonly CancellationTokenSource _quit = new CancellationTokenSource();
 		ViewState _view = new ViewState();
 		CheckResult _last;
 		string _toastAction;
-		DateTime _lastSelfCheck = DateTime.MinValue;
+		// A newer updater: shown in the window and menu, installed by itself when _appAt has passed.
+		Release _app;
+		DateTime _appAt;
+		bool _appBusy;
 		// After a failed check: wait 15 minutes, then twice as long each time, at most the normal interval.
 		DateTime _retryAt = DateTime.MinValue;
 		TimeSpan _backoff = TimeSpan.FromMinutes(15);
@@ -54,11 +56,13 @@ namespace EldoUI.Updater
 			_form.OpenAddOnsClicked += OpenAddOns;
 			_form.AutostartChanged += on => SetAutostart(on);
 			_form.AutoInstallChanged += on => SetAutoInstall(on);
+			_form.AppUpdateClicked += () => InstallApp();
 
 			_menu = new ContextMenuStrip { Renderer = new MenuRenderer(), ShowImageMargin = false, ShowCheckMargin = true, Font = Theme.Body(9.5f), ForeColor = Theme.Text, BackColor = Theme.Panel };
 			_miStatus = new ToolStripMenuItem { Enabled = false, Tag = "head" };
 			_miOpen = new ToolStripMenuItem("", null, (s, e) => ShowWindow()) { Font = Theme.Body(9.5f, FontStyle.Bold) };
 			_miCheck = new ToolStripMenuItem("", null, (s, e) => Check(true, false));
+			_miSelf = new ToolStripMenuItem("", null, (s, e) => InstallApp()) { Visible = false };
 			_miNotes = new ToolStripMenuItem("", null, (s, e) => OpenUrl(_last != null && _last.Release != null ? _last.Release.PageUrl : SiteUrl));
 			_miFolder = new ToolStripMenuItem("", null, (s, e) => ChooseFolder());
 			_miAddOns = new ToolStripMenuItem("", null, (s, e) => OpenAddOns());
@@ -76,7 +80,7 @@ namespace EldoUI.Updater
 			_menu.Items.AddRange(new ToolStripItem[]
 			{
 				_miStatus, new ToolStripSeparator(),
-				_miOpen, _miCheck, _miNotes, new ToolStripSeparator(),
+				_miOpen, _miCheck, _miSelf, _miNotes, new ToolStripSeparator(),
 				_miFolder, _miAddOns, new ToolStripSeparator(),
 				_miAuto, _miStartup, _miLang, new ToolStripSeparator(),
 				_miSite, _miExit,
@@ -88,7 +92,11 @@ namespace EldoUI.Updater
 			_tray.BalloonTipClicked += (s, e) => OnToastClicked();
 
 			_timer = new System.Windows.Forms.Timer { Interval = 60 * 1000 };
-			_timer.Tick += (s, e) => { if (Due()) Check(false, false); };
+			_timer.Tick += (s, e) =>
+			{
+				if (_app != null && SelfUpdatePolicy.Due(_appAt, DateTime.UtcNow)) InstallApp();
+				else if (Due()) Check(false, false);
+			};
 			_timer.Start();
 			SystemEvents.PowerModeChanged += OnPower;
 
@@ -103,8 +111,9 @@ namespace EldoUI.Updater
 					Save();
 				}
 			}
+			// The app's own updates are never announced with a notice: the window and menu show them.
+			if (justUpdated && SelfUpdatePolicy.Clear(_settings)) Save();
 			UpdateView(null);
-			if (justUpdated) Toast(T.S("toast.self.title"), T.F("toast.self.body", Setup.Version), ToolTipIcon.Info, null);
 			if (showWindow) ShowWindow();
 			// The first check soon after start, so a login does not wait three hours.
 			var first = new System.Windows.Forms.Timer { Interval = showWindow ? 800 : 20 * 1000 };
@@ -151,6 +160,9 @@ namespace EldoUI.Updater
 		{
 			_miStatus.Text = _view.Installed != null ? "EldoUI " + _view.Installed : T.S("app");
 			_miCheck.Enabled = !_engine.Busy;
+			_miSelf.Visible = _app != null;
+			_miSelf.Enabled = !_appBusy;
+			if (_app != null) _miSelf.Text = T.F("menu.self", _app.Version);
 			_miAddOns.Enabled = !string.IsNullOrEmpty(_settings.AddOnsDir);
 			_miAuto.Checked = _settings.AutoInstall;
 			_miStartup.Checked = Setup.Autostart;
@@ -199,7 +211,7 @@ namespace EldoUI.Updater
 			Save();
 			UpdateView(r);
 			Announce(r, user);
-			await SelfUpdate(user);
+			await CheckApp();
 		}
 
 		void Announce(CheckResult r, bool user)
@@ -242,6 +254,9 @@ namespace EldoUI.Updater
 				LastCheck = _settings.LastCheck,
 				Autostart = Setup.Autostart,
 				AutoInstall = _settings.AutoInstall,
+				AppNew = _app != null ? _app.Version : null,
+				AppAt = _app != null ? (DateTime?)_appAt : null,
+				AppBusy = _appBusy,
 			};
 			if (string.IsNullOrEmpty(_settings.AddOnsDir))
 			{
@@ -283,25 +298,64 @@ namespace EldoUI.Updater
 			_tray.Text = tip.Length > 63 ? tip.Substring(0, 63) : tip;
 		}
 
-		async Task SelfUpdate(bool user)
+		/// <summary>Looks for a newer updater at every check. It is only shown; it installs itself 24 hours after it was first seen.</summary>
+		async Task CheckApp()
 		{
-			if (!_settings.SelfUpdate || !Setup.RunningInstalled) return;
-			if (!user && DateTime.UtcNow - _lastSelfCheck < SelfCheckEvery) return;
-			_lastSelfCheck = DateTime.UtcNow;
+			if (!_settings.SelfUpdate || _appBusy) return;
 			var r = await _engine.NewerUpdaterAsync(Setup.Version, _quit.Token);
-			if (r == null) return;
+			if (r == null)
+			{
+				// Also when GitHub could not be reached: a version already seen keeps its place.
+				bool reached = _last != null && _last.Outcome != CheckOutcome.Offline && _last.Outcome != CheckOutcome.Failed;
+				if (_app == null && reached && SelfUpdatePolicy.Clear(_settings)) Save();
+				return;
+			}
+			bool first = _app == null || _app.Version != r.Version;
+			_app = r;
+			_appAt = SelfUpdatePolicy.Note(_settings, r.Version, DateTime.UtcNow);
+			Save();
+			if (first) Log.Write("Updater " + r.Version + " is out; it installs itself at " + _appAt.ToLocalTime().ToString("g"));
+			UpdateView(_last);
+			if (SelfUpdatePolicy.Due(_appAt, DateTime.UtcNow)) await InstallAppAsync();
+		}
+
+		async void InstallApp()
+		{
+			await InstallAppAsync();
+		}
+
+		/// <summary>Downloads the newer updater, checks it, puts it in place and restarts into it.</summary>
+		async Task InstallAppAsync()
+		{
+			if (_app == null || _appBusy) return;
+			if (!Setup.RunningInstalled)
+			{
+				// A copy started from elsewhere cannot replace the installed one; the installed copy does it.
+				Log.Write("Updater " + _app.Version + " not installed: this copy runs from " + Setup.CurrentExe);
+				return;
+			}
+			_appBusy = true;
+			UpdateView(_last);
 			string target = Setup.InstalledExe + ".download";
 			try
 			{
-				await _engine.DownloadUpdaterAsync(r, target, _quit.Token);
-				Log.Write("Updating the updater to " + r.Version);
+				await _engine.DownloadUpdaterAsync(_app, target, _quit.Token);
+				Log.Write("Updating the updater to " + _app.Version);
 				Setup.ReplaceAndRestart(target);
 				Exit();
+			}
+			catch (OperationCanceledException)
+			{
+				try { File.Delete(target); } catch { }
 			}
 			catch (Exception ex)
 			{
 				Log.Write("Updater self-update failed: " + ex.Message);
 				try { File.Delete(target); } catch { }
+				// Try again at the next check, not every minute.
+				_appAt = DateTime.UtcNow + CheckEvery;
+				_appBusy = false;
+				UpdateView(_last);
 			}
 		}
 
