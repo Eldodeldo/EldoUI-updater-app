@@ -1,5 +1,6 @@
-// When the updater replaces itself: a new version is shown quietly in the window and menu (never as a
-// notice) and installs by itself 24 hours after it was first seen, or at once when the player chooses.
+// When the updater replaces itself: a new version found when the app starts installs at once (BootCheck).
+// One found while it runs is shown quietly in the window and menu (never as a notice) and installs by itself
+// 24 hours after it was first seen, or at once when the player chooses.
 using System;
 
 namespace EldoUI.Updater.Core

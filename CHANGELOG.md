@@ -2,10 +2,20 @@
 
 Each release of the EldoUI Updater. The newest is at the top.
 
-## [1.1.2] - 2026-10-21
+## [1.2.1] - 2026-10-22
+
+### New
+- "Check for an app update" in the tray menu checks for a new version of the updater right away and always tells you the result: a new version is out (it installs at once and the updater restarts), you already have the newest version, or GitHub could not be reached.
 
 ### Improved
 - The menu's EldoUI link now opens EldoUI's page on GitHub, where every release and its notes are.
+
+## [1.2.0] - 2026-10-22
+
+### Improved
+- The updater checks for updates right when it starts, also at login, and installs what it finds at once: a new EldoUI and a new version of the updater itself. It happens quietly, with no notice and no window, and then the updater runs as usual. If the network is not up yet, it tries again every minute for ten minutes.
+- A new version of the updater found while it is running still installs itself 24 hours later, or at once with "Update now".
+- The restart into a new version runs hidden, so no console or window flashes. When you start the updater yourself, its window opens once that first check is done, so an update never closes it again.
 
 ## [1.1.1] - 2026-10-21
 

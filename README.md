@@ -22,7 +22,7 @@ in your AddOns folder by itself. Your EldoUI settings stay as they are.
 3. That is all. If EldoUI is not installed yet, the updater installs it. When a new version comes out, it
    installs that too and tells you. Type `/reload` in the game if it is open.
 
-Right-click the troll icon for the menu: check now, choose the WoW folder, open the AddOns folder,
+Right-click the troll icon for the menu: check now, check for an app update (it always says what it found), choose the WoW folder, open the AddOns folder,
 install updates automatically (on or off), start with Windows (on or off), language, and exit.
 
 **Windows SmartScreen** may say "Windows protected your PC" the first time, because the exe is not
@@ -74,7 +74,12 @@ once with `--appimage-extract-and-run` to try it.
   the game's `WTF` folder (your settings) are never touched.
 - A pre-release (a version such as `1.2.3-beta`) counts as older than the release of the same number, so the
   release replaces it at the next check.
-- Updates itself from this repository's releases, with the same checksum rule: a new version shows quietly in the window and menu (no pop-up) and installs itself 24 hours later, or at once with "Update now".
+- Checks right when it starts (at login too): a new EldoUI, and a new version of the updater itself, install at
+  once and quietly, with no notice, no window and no console, and then the updater runs as usual. If the network
+  is not up yet, it tries again every minute for ten minutes.
+- Updates itself from this repository's releases, with the same checksum rule. A new version found while it is
+  running shows quietly in the window and menu (no pop-up) and installs itself 24 hours later, or at once with
+  "Update now". The restart into the new version is hidden too.
 
 Files on Windows:
 

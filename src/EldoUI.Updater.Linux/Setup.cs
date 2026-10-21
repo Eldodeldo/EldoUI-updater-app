@@ -138,11 +138,12 @@ namespace EldoUI.Updater
 		/// Puts a downloaded new version in place of the running AppImage and starts it. Linux lets a running file
 		/// be replaced by a rename: the running copy keeps its old file until it exits.
 		/// </summary>
-		public static void ReplaceAndRestart(string newApp)
+		public static void ReplaceAndRestart(string newApp, bool showWindow)
 		{
 			MakeRunnable(newApp);
 			File.Move(newApp, InstalledApp, true);
-			Process.Start(new ProcessStartInfo(InstalledApp, "--tray --updated") { UseShellExecute = false, WorkingDirectory = InstallDir });
+			// Hidden: no terminal or window opens while it restarts into the new version.
+			Process.Start(new ProcessStartInfo(InstalledApp, showWindow ? "--updated" : "--tray --updated") { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = InstallDir });
 		}
 
 		static void MakeRunnable(string path)
