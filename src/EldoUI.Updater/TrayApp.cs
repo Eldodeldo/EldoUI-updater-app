@@ -101,16 +101,7 @@ namespace EldoUI.Updater
 			SystemEvents.PowerModeChanged += OnPower;
 
 			ApplyTexts();
-			if (string.IsNullOrEmpty(_settings.AddOnsDir) || WowFolders.ResolveAddOns(_settings.AddOnsDir) == null)
-			{
-				string found = WowSearch.Find();
-				if (found != null)
-				{
-					_settings.AddOnsDir = found;
-					Log.Write("Found WoW: Forever AddOns at " + found);
-					Save();
-				}
-			}
+			FindFolder();
 			// The app's own updates are never announced with a notice: the window and menu show them.
 			if (justUpdated && SelfUpdatePolicy.Clear(_settings)) Save();
 			UpdateView(null);
@@ -119,6 +110,32 @@ namespace EldoUI.Updater
 			var first = new System.Windows.Forms.Timer { Interval = showWindow ? 800 : 20 * 1000 };
 			first.Tick += (s, e) => { first.Stop(); first.Dispose(); Check(showWindow, false); };
 			first.Start();
+		}
+
+		/// <summary>
+		/// Finds WoW: Forever when no folder is set, and moves to the released game's _forever_ folder when it
+		/// appears (next to the beta, or wherever Battle.net installed it). Nothing changes when the folder in use
+		/// is already the released game.
+		/// </summary>
+		void FindFolder()
+		{
+			string cur = _settings.AddOnsDir;
+			bool valid = false;
+			try { valid = !string.IsNullOrEmpty(cur) && Directory.Exists(Path.GetDirectoryName(Path.GetDirectoryName(cur.TrimEnd('\\', '/')))); }
+			catch { }
+			if (valid && WowFolders.Rank(cur) == 0) return;
+			string better = valid ? WowFolders.Better(cur) : null;
+			if (better == null)
+			{
+				string found = WowSearch.Find();
+				if (found != null && (!valid || WowFolders.Rank(found) < WowFolders.Rank(cur))) better = found;
+			}
+			if (better == null || string.Equals(better, cur, StringComparison.OrdinalIgnoreCase)) return;
+			// A different game folder: what the last install put elsewhere is not ours to remove here.
+			if (valid) _settings.InstalledFolders.Clear();
+			_settings.AddOnsDir = better;
+			Log.Write((valid ? "Moved to WoW: Forever AddOns at " : "Found WoW: Forever AddOns at ") + better);
+			Save();
 		}
 
 		bool Due()
@@ -175,6 +192,7 @@ namespace EldoUI.Updater
 		async void Check(bool user, bool install)
 		{
 			if (_engine.Busy) return;
+			FindFolder();
 			if (string.IsNullOrEmpty(_settings.AddOnsDir))
 			{
 				UpdateView(null);

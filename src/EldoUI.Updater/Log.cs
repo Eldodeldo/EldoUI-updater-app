@@ -71,6 +71,19 @@ namespace EldoUI.Updater
 					catch { }
 				}
 			}
+			// Battle.net's own lists: the folder games install into, and every game it has installed.
+			try
+			{
+				string config = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Battle.net", "Battle.net.config");
+				if (File.Exists(config)) roots.AddRange(WowFolders.FromBattleNetConfig(File.ReadAllText(config)));
+			}
+			catch { }
+			try
+			{
+				string db = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Battle.net", "Agent", "product.db");
+				if (File.Exists(db) && new FileInfo(db).Length < 4 * 1024 * 1024) roots.AddRange(WowFolders.FromProductDb(File.ReadAllBytes(db)));
+			}
+			catch { }
 			var drives = DriveInfo.GetDrives().Where(d => { try { return d.DriveType == DriveType.Fixed && d.IsReady; } catch { return false; } })
 				.Select(d => d.RootDirectory.FullName);
 			roots.AddRange(WowFolders.CommonPlaces(drives));
