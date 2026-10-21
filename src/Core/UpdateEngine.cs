@@ -37,9 +37,11 @@ namespace EldoUI.Updater.Core
 		public const string AddonRepo = "Eldodeldo/EldoUI";
 		public const string AddonAssetPattern = @"^EldoUI-v?[0-9][0-9.]*\.zip$";
 		public const string UpdaterRepo = "Eldodeldo/EldoUI-updater-app";
+		/// <summary>The updater's own file: the Windows exe, and the Linux AppImage in the same release.</summary>
 		public const string UpdaterAssetPattern = @"^EldoUI-Updater\.exe$";
+		public const string LinuxUpdaterAssetPattern = @"^EldoUI-Updater-x86_64\.AppImage$";
 		const long MaxAddonZip = 200L * 1024 * 1024;
-		const long MaxUpdaterExe = 50L * 1024 * 1024;
+		const long MaxUpdaterFile = 200L * 1024 * 1024;
 
 		readonly IWeb _web;
 		readonly string _apiBase;
@@ -167,13 +169,16 @@ namespace EldoUI.Updater.Core
 			return sha;
 		}
 
-		/// <summary>The updater's own newest release when it is newer than the running one, else null. Never throws.</summary>
-		public async Task<Release> NewerUpdaterAsync(string currentVersion, CancellationToken ct)
+		/// <summary>
+		/// The updater's own newest release when it is newer than the running one and has this platform's file
+		/// (assetPattern: the exe by default, LinuxUpdaterAssetPattern on Linux), else null. Never throws.
+		/// </summary>
+		public async Task<Release> NewerUpdaterAsync(string currentVersion, CancellationToken ct, string assetPattern = UpdaterAssetPattern)
 		{
 			try
 			{
 				var r = await LatestAsync(UpdaterRepo, ct).ConfigureAwait(false);
-				if (r != null && r.Find(UpdaterAssetPattern) != null && Versions.IsNewer(r.Version, currentVersion)) return r;
+				if (r != null && r.Find(assetPattern) != null && Versions.IsNewer(r.Version, currentVersion)) return r;
 			}
 			catch (Exception ex)
 			{
@@ -182,9 +187,9 @@ namespace EldoUI.Updater.Core
 			return null;
 		}
 
-		public Task<string> DownloadUpdaterAsync(Release r, string target, CancellationToken ct)
+		public Task<string> DownloadUpdaterAsync(Release r, string target, CancellationToken ct, string assetPattern = UpdaterAssetPattern)
 		{
-			return DownloadCheckedAsync(r.Find(UpdaterAssetPattern), target, MaxUpdaterExe, ct);
+			return DownloadCheckedAsync(r.Find(assetPattern), target, MaxUpdaterFile, ct);
 		}
 	}
 }

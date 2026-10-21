@@ -2,6 +2,12 @@
 
 Each release of the EldoUI Updater. The newest is at the top.
 
+## [1.1.0] - 2026-10-21
+
+### New
+- EldoUI Updater for Linux, as one AppImage file. It finds WoW: Forever inside Wine, Lutris, Bottles and Steam (Proton) and keeps EldoUI up to date there, with the same window, tray icon, languages and quiet self-update as on Windows.
+- On Linux it adds itself to the app menu and starts when you log in (you can turn that off).
+
 ## [1.0.3] - 2026-10-21
 
 ### Improved
