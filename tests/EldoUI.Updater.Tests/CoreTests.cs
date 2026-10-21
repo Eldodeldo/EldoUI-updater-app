@@ -407,6 +407,15 @@ namespace EldoUI.Updater.Tests
 		}
 	}
 
+	/// <summary>A test that only means something on Linux (it is reported as skipped elsewhere).</summary>
+	public sealed class LinuxFactAttribute : FactAttribute
+	{
+		public LinuxFactAttribute()
+		{
+			if (!OperatingSystem.IsLinux()) Skip = "Linux only";
+		}
+	}
+
 	public class WineFolderTests
 	{
 		[Fact]
@@ -437,11 +446,13 @@ namespace EldoUI.Updater.Tests
 				Directory.CreateDirectory(t.Sub(".local/share/bottles/bottles/Battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_beta_"));
 				string proton = t.Sub(".steam/steam/steamapps/compatdata/123456/pfx");
 				Directory.CreateDirectory(Path.Combine(proton, "drive_c/Program Files (x86)/World of Warcraft/_forever_"));
-				Assert.Equal(Path.Combine(proton, "drive_c/Program Files (x86)/World of Warcraft/_forever_", "Interface", "AddOns"), WineFolders.Find(home));
+				string want = Path.Combine(proton, "drive_c/Program Files (x86)/World of Warcraft/_forever_", "Interface", "AddOns");
+				Assert.Equal(Path.GetFullPath(want), Path.GetFullPath(WineFolders.Find(home)));
 			}
 		}
 
-		[Fact]
+		// Wine's dosdevices\d: is a Linux symlink; Windows cannot even name a file "d:". The Linux CI job runs it.
+		[LinuxFact]
 		public void FollowsBattleNetInsideThePrefixToAnotherDrive()
 		{
 			using (var t = new TempDir())
