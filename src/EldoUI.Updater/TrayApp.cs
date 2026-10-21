@@ -15,7 +15,7 @@ namespace EldoUI.Updater
 	sealed class TrayApp : ApplicationContext
 	{
 		static readonly TimeSpan CheckEvery = TimeSpan.FromHours(3);
-		const string SiteUrl = "https://eldodeldo.dk/eldoui/";
+		const string SiteUrl = "https://github.com/Eldodeldo/EldoUI";
 
 		readonly Settings _settings;
 		readonly Web _web;

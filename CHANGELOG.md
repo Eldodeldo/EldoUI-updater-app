@@ -2,6 +2,11 @@
 
 Each release of the EldoUI Updater. The newest is at the top.
 
+## [1.1.2] - 2026-10-21
+
+### Improved
+- The menu's EldoUI link now opens EldoUI's page on GitHub, where every release and its notes are.
+
 ## [1.1.1] - 2026-10-21
 
 ### Improved
