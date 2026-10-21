@@ -16,6 +16,7 @@ namespace EldoUI.Updater
 	{
 		static readonly TimeSpan CheckEvery = TimeSpan.FromHours(3);
 		const string SiteUrl = "https://github.com/Eldodeldo/EldoUI";
+		const string ReleasesUrl = "https://github.com/Eldodeldo/EldoUI/releases/latest";
 
 		readonly Settings _settings;
 		readonly Web _web;
@@ -63,7 +64,7 @@ namespace EldoUI.Updater
 			_miOpen = new ToolStripMenuItem("", null, (s, e) => ShowWindow()) { Font = Theme.Body(9.5f, FontStyle.Bold) };
 			_miCheck = new ToolStripMenuItem("", null, (s, e) => Check(true, false));
 			_miSelf = new ToolStripMenuItem("", null, (s, e) => InstallApp()) { Visible = false };
-			_miNotes = new ToolStripMenuItem("", null, (s, e) => OpenUrl(_last != null && _last.Release != null ? _last.Release.PageUrl : SiteUrl));
+			_miNotes = new ToolStripMenuItem("", null, (s, e) => OpenUrl(_last != null && _last.Release != null ? _last.Release.PageUrl : ReleasesUrl));
 			_miFolder = new ToolStripMenuItem("", null, (s, e) => ChooseFolder());
 			_miAddOns = new ToolStripMenuItem("", null, (s, e) => OpenAddOns());
 			_miAuto = new ToolStripMenuItem("", null, (s, e) => SetAutoInstall(!_settings.AutoInstall));

@@ -17,6 +17,7 @@ namespace EldoUI.Updater
 	{
 		static readonly TimeSpan CheckEvery = TimeSpan.FromHours(3);
 		const string SiteUrl = "https://github.com/Eldodeldo/EldoUI";
+		const string ReleasesUrl = "https://github.com/Eldodeldo/EldoUI/releases/latest";
 
 		readonly Settings _settings;
 		readonly Web _web;
@@ -60,7 +61,7 @@ namespace EldoUI.Updater
 			_miOpen = Item(() => ShowWindow());
 			_miCheck = Item(() => Check(true, false));
 			_miSelf = Item(() => InstallApp());
-			_miNotes = Item(() => Setup.Open(_last != null && _last.Release != null ? _last.Release.PageUrl : SiteUrl));
+			_miNotes = Item(() => Setup.Open(_last != null && _last.Release != null ? _last.Release.PageUrl : ReleasesUrl));
 			_miFolder = Item(() => _ = ChooseFolder());
 			_miAddOns = Item(OpenAddOns);
 			_miAuto = Item(() => SetAutoInstall(!_settings.AutoInstall));
