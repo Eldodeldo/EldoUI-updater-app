@@ -27,7 +27,26 @@ namespace EldoUI.Updater.Core
 		/// <summary>Reads GitHub's "get the latest release" answer. Drafts and pre-releases are refused.</summary>
 		public static Release FromGitHub(string json)
 		{
-			var o = Json.ParseObject(json);
+			return FromObject(Json.ParseObject(json));
+		}
+
+		/// <summary>Reads GitHub's "list releases" answer: the published, non-test releases, newest first as GitHub sends them.</summary>
+		public static List<Release> ListFromGitHub(string json)
+		{
+			var list = Json.Parse(json) as List<object>;
+			if (list == null) throw new FormatException("Expected a JSON list of releases.");
+			var result = new List<Release>();
+			foreach (var item in list)
+			{
+				var o = item as Dictionary<string, object>;
+				var r = o == null ? null : FromObject(o);
+				if (r != null && r.Version != null) result.Add(r);
+			}
+			return result;
+		}
+
+		static Release FromObject(Dictionary<string, object> o)
+		{
 			if (o.Bool("draft") || o.Bool("prerelease")) return null;
 			var r = new Release
 			{

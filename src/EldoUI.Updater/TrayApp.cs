@@ -267,6 +267,8 @@ namespace EldoUI.Updater
 						v.Action = v.Installed == null ? MainAction.Install : MainAction.Update; break;
 					case CheckOutcome.Offline:
 						v.Kind = StatusKind.Warn; v.Status = T.S("state.offline"); break;
+					case CheckOutcome.NoDownload:
+						v.Kind = StatusKind.Info; v.Status = T.S("state.nodownload"); break;
 					case CheckOutcome.NoFolder:
 						v.Kind = StatusKind.Warn; v.Status = T.S("state.nofolder"); v.Action = MainAction.ChooseFolder; break;
 					default:
