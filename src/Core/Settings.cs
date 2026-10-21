@@ -23,7 +23,7 @@ namespace EldoUI.Updater.Core
 		public string AnnouncedVersion = "";
 		public DateTime? LastCheck;
 		public bool Welcomed;
-		/// <summary>A newer version of the updater itself, and when it was first seen (it installs 24 hours later).</summary>
+		/// <summary>A newer version of the updater itself, and when it was first seen (found while the app runs, it installs 24 hours later; found at start, at once).</summary>
 		public string UpdaterSeenVersion = "";
 		public DateTime? UpdaterSeenAt;
 

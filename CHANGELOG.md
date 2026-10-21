@@ -2,6 +2,13 @@
 
 Each release of the EldoUI Updater. The newest is at the top.
 
+## [1.2.0] - 2026-10-22
+
+### Improved
+- The updater checks for updates right when it starts, also at login, and installs what it finds at once: a new EldoUI and a new version of the updater itself. It happens quietly, with no notice and no window, and then the updater runs as usual. If the network is not up yet, it tries again every minute for ten minutes.
+- A new version of the updater found while it is running still installs itself 24 hours later, or at once with "Update now".
+- The restart into a new version runs hidden, so no console or window flashes. When you start the updater yourself, its window opens once that first check is done, so an update never closes it again.
+
 ## [1.1.1] - 2026-10-21
 
 ### Improved

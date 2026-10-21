@@ -156,7 +156,7 @@ namespace EldoUI.Updater
 		/// Puts a downloaded new version in place of the running exe and starts it. Windows lets a running
 		/// exe be renamed, so the old one moves aside and is deleted by the new one when it starts.
 		/// </summary>
-		public static void ReplaceAndRestart(string newExe)
+		public static void ReplaceAndRestart(string newExe, bool showWindow)
 		{
 			string old = InstalledExe + ".old";
 			try { if (File.Exists(old)) File.Delete(old); } catch { }
@@ -172,7 +172,8 @@ namespace EldoUI.Updater
 			}
 			WriteConfig();
 			RegisterUninstall();
-			Process.Start(new ProcessStartInfo(InstalledExe, "--tray --updated") { UseShellExecute = false, WorkingDirectory = InstallDir });
+			// Hidden: no console or window flashes while it restarts into the new version.
+			Process.Start(new ProcessStartInfo(InstalledExe, showWindow ? "--updated" : "--tray --updated") { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = InstallDir });
 		}
 
 		/// <summary>Removes the previous exe left by a self-update.</summary>
