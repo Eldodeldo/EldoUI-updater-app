@@ -12,6 +12,8 @@ namespace EldoUI.Updater.Core
 	{
 		/// <summary>No WoW: Forever AddOns folder is known yet.</summary>
 		NoFolder,
+		/// <summary>No EldoUI release has its zip file yet (a release can be published before its zip is attached).</summary>
+		NoDownload,
 		UpToDate,
 		/// <summary>A newer EldoUI is out and waits for the player (automatic install is off).</summary>
 		UpdateAvailable,
@@ -70,12 +72,16 @@ namespace EldoUI.Updater.Core
 				var r = new CheckResult { Installed = AddonInstaller.InstalledVersion(settings.AddOnsDir) };
 				try
 				{
-					r.Release = await LatestAsync(AddonRepo, ct).ConfigureAwait(false);
+					// The newest release that has its zip: a release without one (still being uploaded, or
+					// published without it) is skipped rather than reported as an error.
+					string body = await _web.GetApiAsync(_apiBase + "/repos/" + AddonRepo + "/releases?per_page=10", ct).ConfigureAwait(false);
+					var releases = Release.ListFromGitHub(body);
 					settings.LastCheck = DateTime.UtcNow;
-					if (r.Release == null || r.Release.Version == null || r.Release.Find(AddonAssetPattern) == null)
+					r.Release = releases.FirstOrDefault(x => x.Find(AddonAssetPattern) != null);
+					if (r.Release == null)
 					{
-						r.Outcome = CheckOutcome.Failed;
-						r.Error = "The newest EldoUI release has no zip file.";
+						r.Outcome = CheckOutcome.NoDownload;
+						r.Latest = releases.Count > 0 ? releases[0].Version : null;
 						return r;
 					}
 					r.Latest = r.Release.Version;
