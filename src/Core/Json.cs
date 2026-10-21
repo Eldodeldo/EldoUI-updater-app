@@ -45,6 +45,12 @@ namespace EldoUI.Updater.Core
 			return obj != null && obj.TryGetValue(key, out v) && v is double ? (double)v : fallback;
 		}
 
+		public static Dictionary<string, object> Obj(this Dictionary<string, object> obj, string key)
+		{
+			object v;
+			return obj != null && obj.TryGetValue(key, out v) ? v as Dictionary<string, object> : null;
+		}
+
 		public static List<object> Arr(this Dictionary<string, object> obj, string key)
 		{
 			object v;

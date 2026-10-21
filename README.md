@@ -14,8 +14,10 @@ in your AddOns folder by itself. Your EldoUI settings stay as they are.
 ## Using it
 
 1. Run `EldoUI-Updater.exe`. It installs itself for your Windows user (no admin rights) and opens its window.
-2. It looks for WoW: Forever (`World of Warcraft\_classic_beta_`). If it cannot find it, click **Choose folder…**
-   and pick your `World of Warcraft` folder.
+2. It looks for WoW: Forever wherever you installed it: the `_forever_` folder of the released game, or
+   `_classic_beta_` during the beta. It asks Battle.net where your games are, reads the registry and looks in
+   the usual places on every drive. If it cannot find it, click **Choose folder…** and pick your
+   `World of Warcraft` folder. When the released game appears next to the beta, the updater moves to it by itself.
 3. That is all. If EldoUI is not installed yet, the updater installs it. When a new version comes out, it
    installs that too and tells you. Type `/reload` in the game if it is open.
 
