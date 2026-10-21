@@ -2,14 +2,15 @@
 
 # EldoUI Updater
 
-A small Windows app that keeps [EldoUI](https://github.com/Eldodeldo/EldoUI) up to date for **WoW: Forever**.
-It sits in the notification area with the EldoUI troll icon and, when a new EldoUI is released, installs it
+A small app for Windows and Linux that keeps [EldoUI](https://github.com/Eldodeldo/EldoUI) up to date for
+**WoW: Forever**. It sits in the notification area (the system tray) with the EldoUI troll icon and, when a new EldoUI is released, installs it
 in your AddOns folder by itself. Your EldoUI settings stay as they are.
 
-- **Download:** the newest `EldoUI-Updater.exe` from [Releases](https://github.com/Eldodeldo/EldoUI-updater-app/releases/latest)
-  or the EldoUI website.
-- **Needs:** Windows 10 or 11. Nothing else to install.
-- **Size:** under half a megabyte. It checks for a new EldoUI every three hours and otherwise does nothing.
+- **Download:** from [Releases](https://github.com/Eldodeldo/EldoUI-updater-app/releases/latest) or the EldoUI
+  website: `EldoUI-Updater.exe` for Windows, `EldoUI-Updater-x86_64.AppImage` for Linux.
+- **Needs:** Windows 10 or 11, or a 64-bit Linux desktop. Nothing else to install.
+- **Size:** under half a megabyte on Windows, about 40 MB on Linux (it carries its own runtime). It checks
+  for a new EldoUI every three hours and otherwise does nothing.
 
 ## Using it
 
@@ -30,6 +31,33 @@ SHA-256 checksum in `SHA256SUMS.txt`.
 
 **To remove it:** Settings → Apps → Installed apps → EldoUI Updater → Uninstall. EldoUI itself stays in the game.
 
+## Linux
+
+WoW: Forever runs on Linux through Wine, so the updater looks for it inside Wine prefixes: `$WINEPREFIX`,
+`~/.wine`, Lutris (games in `~/Games` and every prefix in Lutris' game files), Bottles, and Steam's Proton
+prefixes in every Steam library (native and Flatpak installs). In each prefix it asks Battle.net where the
+games are, then looks in the usual places, and picks `_forever_` before `_classic_beta_`.
+
+1. Download `EldoUI-Updater-x86_64.AppImage` and make it runnable, in your file manager (Properties →
+   Allow executing as a program) or in a terminal:
+   ```
+   chmod +x EldoUI-Updater-x86_64.AppImage
+   ```
+2. Run it. It installs itself for your user, adds itself to the app menu and to the apps that start when
+   you log in, and opens its window. You can delete the downloaded file afterwards.
+3. If it cannot find the game, click **Choose folder…** and pick the `World of Warcraft` folder (or the Wine
+   prefix that holds it).
+
+The troll icon sits in the system tray. KDE, Cinnamon, XFCE and most others show it as it is; on GNOME,
+install the *AppIndicator and KStatusNotifierItem Support* extension (Ubuntu has it already). Without a tray
+the window opens instead, and closing it leaves the updater running.
+
+If the AppImage does not start and mentions FUSE, install your distribution's `fuse3` package, or run it
+once with `--appimage-extract-and-run` to try it.
+
+**To remove it:** run it with `--uninstall`
+(`~/.local/share/eldoui-updater/EldoUI-Updater.AppImage --uninstall`). EldoUI itself stays in the game.
+
 ## How it works
 
 - Asks GitHub's public API for the newest release of `Eldodeldo/EldoUI` (no account, no token, nothing
@@ -42,13 +70,23 @@ SHA-256 checksum in `SHA256SUMS.txt`.
   and the game's `WTF` folder (your settings) are never touched.
 - Updates itself from this repository's releases: a new version shows quietly in the window and menu (no pop-up) and installs itself 24 hours later, or at once with "Update now".
 
-Files on your PC:
+Files on Windows:
 
 | What | Where |
 | --- | --- |
 | The program | `%LOCALAPPDATA%\Programs\EldoUI Updater\` |
 | Settings and log (`updater.log`) | `%LOCALAPPDATA%\EldoUI Updater\` |
 | Start with Windows | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` → `EldoUI Updater` |
+
+Files on Linux:
+
+| What | Where |
+| --- | --- |
+| The program and its icon | `~/.local/share/eldoui-updater/` |
+| Settings | `~/.config/eldoui-updater/settings.json` |
+| Log (`updater.log`) | `~/.local/state/eldoui-updater/` |
+| App menu entry | `~/.local/share/applications/eldoui-updater.desktop` |
+| Start when you log in | `~/.config/autostart/eldoui-updater.desktop` |
 
 ## Building
 
@@ -62,14 +100,25 @@ dotnet build src/EldoUI.Updater -c Release
 The exe is `src/EldoUI.Updater/bin/Release/net48/EldoUI Updater.exe`. On Windows it also takes
 `--selftest` (checks the install logic in a temp folder) and `--snapshot <folder>` (pictures of the window).
 
-`src/Core` has everything without UI (GitHub answer, versions, zip checks and install, WoW folders,
-settings) and is what the tests cover. `src/EldoUI.Updater` is the tray app and its window.
+The Linux app is .NET 8 with Avalonia, published as one self-contained file and wrapped in an AppImage
+(needs `desktop-file-utils`):
+
+```
+bash packaging/linux/build-appimage.sh publish
+```
+
+It also takes `--selftest` and `--snapshot <folder>` (rendered without a display).
+
+`src/Core` has everything without UI (GitHub answer, versions, zip checks and install, WoW folders, Wine
+prefixes, settings) and is what the tests cover; both apps compile it. `src/EldoUI.Updater` is the Windows
+tray app and its window, `src/EldoUI.Updater.Linux` the Linux one (same texts, design and behaviour).
 
 ## Releasing
 
-Raise `<Version>` in `src/EldoUI.Updater/EldoUI.Updater.csproj`, add a section for it at the top of
+Raise `<Version>` in `src/Directory.Build.props` (shared by both apps), add a section for it at the top of
 `CHANGELOG.md`, and merge. The `build` workflow publishes the release (`v<version>` with
-`EldoUI-Updater.exe` and `SHA256SUMS.txt`), and installed updaters pick it up within a day.
+`EldoUI-Updater.exe`, `EldoUI-Updater-x86_64.AppImage` and `SHA256SUMS.txt`), and installed updaters pick it
+up within a day.
 
 ## License
 

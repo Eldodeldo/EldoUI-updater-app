@@ -9,7 +9,6 @@
     <LangVersion>7.3</LangVersion>
     <RootNamespace>EldoUI.Updater</RootNamespace>
     <AssemblyName>EldoUI Updater</AssemblyName>
-    <Version>1.0.3</Version>
     <Product>EldoUI Updater</Product>
     <Company>Eldodeldo</Company>
     <Authors>Eldodeldo</Authors>
