@@ -15,7 +15,8 @@ namespace EldoUI.Updater
 	sealed class TrayApp : ApplicationContext
 	{
 		static readonly TimeSpan CheckEvery = TimeSpan.FromHours(3);
-		const string SiteUrl = "https://eldodeldo.dk/eldoui/";
+		const string SiteUrl = "https://github.com/Eldodeldo/EldoUI";
+		const string ReleasesUrl = "https://github.com/Eldodeldo/EldoUI/releases/latest";
 
 		readonly Settings _settings;
 		readonly Web _web;
@@ -26,7 +27,7 @@ namespace EldoUI.Updater
 		readonly System.Windows.Forms.Timer _timer;
 		readonly SynchronizationContext _ui;
 		readonly ToolStripMenuItem _miStatus, _miAuto, _miStartup, _miLangAuto, _miLangEn, _miLangDa, _miNotes;
-		readonly ToolStripMenuItem _miOpen, _miCheck, _miSelf, _miFolder, _miAddOns, _miLang, _miSite, _miExit;
+		readonly ToolStripMenuItem _miOpen, _miCheck, _miSelf, _miAppCheck, _miFolder, _miAddOns, _miLang, _miSite, _miExit;
 		readonly CancellationTokenSource _quit = new CancellationTokenSource();
 		ViewState _view = new ViewState();
 		CheckResult _last;
@@ -35,6 +36,7 @@ namespace EldoUI.Updater
 		Release _app;
 		DateTime _appAt;
 		bool _appBusy;
+		bool _appChecking;
 		// After a failed check: wait 15 minutes, then twice as long each time, at most the normal interval.
 		DateTime _retryAt = DateTime.MinValue;
 		TimeSpan _backoff = TimeSpan.FromMinutes(15);
@@ -67,7 +69,8 @@ namespace EldoUI.Updater
 			_miOpen = new ToolStripMenuItem("", null, (s, e) => ShowWindow()) { Font = Theme.Body(9.5f, FontStyle.Bold) };
 			_miCheck = new ToolStripMenuItem("", null, (s, e) => Check(true, false));
 			_miSelf = new ToolStripMenuItem("", null, (s, e) => InstallApp()) { Visible = false };
-			_miNotes = new ToolStripMenuItem("", null, (s, e) => OpenUrl(_last != null && _last.Release != null ? _last.Release.PageUrl : SiteUrl));
+			_miAppCheck = new ToolStripMenuItem("", null, (s, e) => CheckAppNow());
+			_miNotes = new ToolStripMenuItem("", null, (s, e) => OpenUrl(_last != null && _last.Release != null ? _last.Release.PageUrl : ReleasesUrl));
 			_miFolder = new ToolStripMenuItem("", null, (s, e) => ChooseFolder());
 			_miAddOns = new ToolStripMenuItem("", null, (s, e) => OpenAddOns());
 			_miAuto = new ToolStripMenuItem("", null, (s, e) => SetAutoInstall(!_settings.AutoInstall));
@@ -84,7 +87,7 @@ namespace EldoUI.Updater
 			_menu.Items.AddRange(new ToolStripItem[]
 			{
 				_miStatus, new ToolStripSeparator(),
-				_miOpen, _miCheck, _miSelf, _miNotes, new ToolStripSeparator(),
+				_miOpen, _miCheck, _miSelf, _miAppCheck, _miNotes, new ToolStripSeparator(),
 				_miFolder, _miAddOns, new ToolStripSeparator(),
 				_miAuto, _miStartup, _miLang, new ToolStripSeparator(),
 				_miSite, _miExit,
@@ -171,6 +174,7 @@ namespace EldoUI.Updater
 		{
 			_miOpen.Text = T.S("menu.open");
 			_miCheck.Text = T.S("menu.check");
+			_miAppCheck.Text = T.S("menu.appcheck");
 			_miNotes.Text = T.S("menu.notes");
 			_miFolder.Text = T.S("menu.folder");
 			_miAddOns.Text = T.S("menu.addons");
@@ -189,6 +193,7 @@ namespace EldoUI.Updater
 			_miCheck.Enabled = !_engine.Busy;
 			_miSelf.Visible = _app != null;
 			_miSelf.Enabled = !_appBusy;
+			_miAppCheck.Enabled = !_appBusy && !_appChecking;
 			if (_app != null) _miSelf.Text = T.F("menu.self", _app.Version);
 			_miAddOns.Enabled = !string.IsNullOrEmpty(_settings.AddOnsDir);
 			_miAuto.Checked = _settings.AutoInstall;
@@ -368,6 +373,44 @@ namespace EldoUI.Updater
 			else if (first) Log.Write("Updater " + r.Version + " is out; it installs itself at " + _appAt.ToLocalTime().ToString("g"));
 			UpdateView(_last);
 			if (booting || SelfUpdatePolicy.Due(_appAt, DateTime.UtcNow)) await InstallAppAsync();
+		}
+
+		/// <summary>
+		/// "Check for an app update" in the menu: always says what it found. A newer version installs at once and
+		/// restarts the updater; otherwise a message says it is up to date, or that GitHub could not be reached.
+		/// </summary>
+		async void CheckAppNow()
+		{
+			if (_appBusy || _appChecking) return;
+			_appChecking = true;
+			AppCheckResult r;
+			try
+			{
+				r = await _engine.CheckUpdaterAsync(Setup.Version, _quit.Token);
+			}
+			finally
+			{
+				_appChecking = false;
+			}
+			if (_quit.IsCancellationRequested) return;
+			IWin32Window owner = _form.Visible ? _form : null;
+			switch (r.Outcome)
+			{
+				case AppCheckOutcome.Newer:
+					_app = r.Release;
+					_appAt = SelfUpdatePolicy.Note(_settings, r.Release.Version, DateTime.UtcNow);
+					Save();
+					Log.Write("Updater " + r.Release.Version + " is out; installing it now, as asked from the menu");
+					MessageBox.Show(owner, T.S("app.newer.body"), T.F("app.newer.title", r.Release.Version), MessageBoxButtons.OK, MessageBoxIcon.Information);
+					await InstallAppAsync();
+					break;
+				case AppCheckOutcome.UpToDate:
+					MessageBox.Show(owner, T.F("app.uptodate.body", Setup.Version), T.S("app.uptodate.title"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+					break;
+				default:
+					MessageBox.Show(owner, T.S("app.unreachable.body"), T.S("app.unreachable.title"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+					break;
+			}
 		}
 
 		async void InstallApp()

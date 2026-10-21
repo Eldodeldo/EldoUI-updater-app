@@ -22,7 +22,7 @@ in your AddOns folder by itself. Your EldoUI settings stay as they are.
 3. That is all. If EldoUI is not installed yet, the updater installs it. When a new version comes out, it
    installs that too and tells you. Type `/reload` in the game if it is open.
 
-Right-click the troll icon for the menu: check now, choose the WoW folder, open the AddOns folder,
+Right-click the troll icon for the menu: check now, check for an app update (it always says what it found), choose the WoW folder, open the AddOns folder,
 install updates automatically (on or off), start with Windows (on or off), language, and exit.
 
 **Windows SmartScreen** may say "Windows protected your PC" the first time, because the exe is not
