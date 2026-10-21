@@ -17,6 +17,7 @@ namespace EldoUI.Updater
 	{
 		static readonly TimeSpan CheckEvery = TimeSpan.FromHours(3);
 		const string SiteUrl = "https://github.com/Eldodeldo/EldoUI";
+		const string ReleasesUrl = "https://github.com/Eldodeldo/EldoUI/releases/latest";
 
 		readonly Settings _settings;
 		readonly Web _web;
@@ -24,7 +25,7 @@ namespace EldoUI.Updater
 		readonly TrayIcon _tray;
 		readonly MainWindow _form;
 		readonly DispatcherTimer _timer;
-		readonly NativeMenuItem _miStatus, _miOpen, _miCheck, _miSelf, _miNotes, _miFolder, _miAddOns, _miAuto, _miStartup;
+		readonly NativeMenuItem _miStatus, _miOpen, _miCheck, _miSelf, _miAppCheck, _miNotes, _miFolder, _miAddOns, _miAuto, _miStartup;
 		readonly NativeMenuItem _miLang, _miLangAuto, _miLangEn, _miLangDa, _miSite, _miExit;
 		readonly NativeMenu _menu;
 		readonly CancellationTokenSource _quit = new CancellationTokenSource();
@@ -35,6 +36,7 @@ namespace EldoUI.Updater
 		Release _app;
 		DateTime _appAt;
 		bool _appBusy;
+		bool _appChecking;
 		// After a failed check: wait 15 minutes, then twice as long each time, at most the normal interval.
 		DateTime _retryAt = DateTime.MinValue;
 		TimeSpan _backoff = TimeSpan.FromMinutes(15);
@@ -64,7 +66,8 @@ namespace EldoUI.Updater
 			_miOpen = Item(() => ShowWindow());
 			_miCheck = Item(() => Check(true, false));
 			_miSelf = Item(() => InstallApp());
-			_miNotes = Item(() => Setup.Open(_last != null && _last.Release != null ? _last.Release.PageUrl : SiteUrl));
+			_miAppCheck = Item(() => CheckAppNow());
+			_miNotes = Item(() => Setup.Open(_last != null && _last.Release != null ? _last.Release.PageUrl : ReleasesUrl));
 			_miFolder = Item(() => _ = ChooseFolder());
 			_miAddOns = Item(OpenAddOns);
 			_miAuto = Item(() => SetAutoInstall(!_settings.AutoInstall));
@@ -83,7 +86,7 @@ namespace EldoUI.Updater
 			_menu = new NativeMenu
 			{
 				_miStatus, new NativeMenuItemSeparator(),
-				_miOpen, _miCheck, _miSelf, _miNotes, new NativeMenuItemSeparator(),
+				_miOpen, _miCheck, _miSelf, _miAppCheck, _miNotes, new NativeMenuItemSeparator(),
 				_miFolder, _miAddOns, new NativeMenuItemSeparator(),
 				_miAuto, _miStartup, _miLang, new NativeMenuItemSeparator(),
 				_miSite, _miExit,
@@ -139,6 +142,7 @@ namespace EldoUI.Updater
 		{
 			_miOpen.Header = T.S("menu.open");
 			_miCheck.Header = T.S("menu.check");
+			_miAppCheck.Header = T.S("menu.appcheck");
 			_miNotes.Header = T.S("menu.notes");
 			_miFolder.Header = T.S("menu.folder");
 			_miAddOns.Header = T.S("menu.addons");
@@ -158,6 +162,7 @@ namespace EldoUI.Updater
 			_miCheck.IsEnabled = !_engine.Busy;
 			_miSelf.IsVisible = _app != null;
 			_miSelf.IsEnabled = !_appBusy;
+			_miAppCheck.IsEnabled = !_appBusy && !_appChecking;
 			if (_app != null) _miSelf.Header = T.F("menu.self", _app.Version);
 			_miAddOns.IsEnabled = !string.IsNullOrEmpty(_settings.AddOnsDir);
 			_miAuto.IsChecked = _settings.AutoInstall;
@@ -363,6 +368,44 @@ namespace EldoUI.Updater
 			if (booting || SelfUpdatePolicy.Due(_appAt, DateTime.UtcNow)) await InstallAppAsync();
 		}
 
+		/// <summary>
+		/// "Check for an app update" in the menu: always says what it found, with a desktop notice. A newer version
+		/// installs at once and restarts the updater; otherwise the notice says it is up to date, or that GitHub could
+		/// not be reached.
+		/// </summary>
+		async void CheckAppNow()
+		{
+			if (_appBusy || _appChecking) return;
+			_appChecking = true;
+			AppCheckResult r;
+			try
+			{
+				r = await _engine.CheckUpdaterAsync(Setup.Version, _quit.Token, UpdateEngine.LinuxUpdaterAssetPattern);
+			}
+			finally
+			{
+				_appChecking = false;
+			}
+			if (_quit.IsCancellationRequested) return;
+			switch (r.Outcome)
+			{
+				case AppCheckOutcome.Newer:
+					_app = r.Release;
+					_appAt = SelfUpdatePolicy.Note(_settings, r.Release.Version, DateTime.UtcNow);
+					Save();
+					Log.Write("Updater " + r.Release.Version + " is out; installing it now, as asked from the menu");
+					Notify(T.F("app.newer.title", r.Release.Version), T.S("app.newer.body"));
+					await InstallAppAsync();
+					break;
+				case AppCheckOutcome.UpToDate:
+					Notify(T.S("app.uptodate.title"), T.F("app.uptodate.body", Setup.Version));
+					break;
+				default:
+					Notify(T.S("app.unreachable.title"), T.S("app.unreachable.body"));
+					break;
+			}
+		}
+
 		async void InstallApp()
 		{
 			await InstallAppAsync();
@@ -460,7 +503,7 @@ namespace EldoUI.Updater
 			UpdateView(_last);
 		}
 
-		/// <summary>A desktop notice through notify-send, when the desktop has it. Never for the app's own updates.</summary>
+		/// <summary>A desktop notice through notify-send, when the desktop has it. The app's own updates get one only when asked for from the menu.</summary>
 		static void Notify(string title, string body)
 		{
 			try

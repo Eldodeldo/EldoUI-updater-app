@@ -228,22 +228,51 @@ namespace EldoUI.Updater.Core
 		/// </summary>
 		public async Task<Release> NewerUpdaterAsync(string currentVersion, CancellationToken ct, string assetPattern = UpdaterAssetPattern)
 		{
+			var r = await CheckUpdaterAsync(currentVersion, ct, assetPattern).ConfigureAwait(false);
+			return r.Outcome == AppCheckOutcome.Newer ? r.Release : null;
+		}
+
+		/// <summary>
+		/// Asks GitHub for the updater's own newest release: Newer (with the release) when it is newer than the running
+		/// version and has this platform's file, UpToDate when not, Unreachable (with the reason) when GitHub gave no
+		/// answer. Never throws.
+		/// </summary>
+		public async Task<AppCheckResult> CheckUpdaterAsync(string currentVersion, CancellationToken ct, string assetPattern = UpdaterAssetPattern)
+		{
 			try
 			{
 				var r = await LatestAsync(UpdaterRepo, ct).ConfigureAwait(false);
-				if (r != null && r.Find(assetPattern) != null && Versions.IsNewer(r.Version, currentVersion)) return r;
+				if (r != null && r.Find(assetPattern) != null && Versions.IsNewer(r.Version, currentVersion))
+					return new AppCheckResult { Outcome = AppCheckOutcome.Newer, Release = r };
+				return new AppCheckResult { Outcome = AppCheckOutcome.UpToDate, Release = r };
 			}
 			catch (Exception ex)
 			{
 				_log("Updater check skipped: " + ex.Message);
+				return new AppCheckResult { Outcome = AppCheckOutcome.Unreachable, Error = ex.Message };
 			}
-			return null;
 		}
 
 		public Task<string> DownloadUpdaterAsync(Release r, string target, CancellationToken ct, string assetPattern = UpdaterAssetPattern)
 		{
 			return DownloadCheckedAsync(r, r.Find(assetPattern), target, MaxUpdaterFile, ct);
 		}
+	}
+
+	public enum AppCheckOutcome
+	{
+		/// <summary>A newer version of the updater is published for this platform.</summary>
+		Newer,
+		UpToDate,
+		/// <summary>GitHub could not be asked, or did not show the updater's releases.</summary>
+		Unreachable,
+	}
+
+	public sealed class AppCheckResult
+	{
+		public AppCheckOutcome Outcome;
+		public Release Release;
+		public string Error;
 	}
 
 	/// <summary>A download that has no trusted SHA-256, or does not match it. Nothing is installed from it.</summary>
