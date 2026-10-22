@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: EldoUI addon problem
+    url: https://github.com/Eldodeldo/EldoUI/issues
+    about: Problems with EldoUI in the game go to the EldoUI repository.
+  - name: Security problem
+    url: https://github.com/Eldodeldo/EldoUI-updater-app/security/advisories/new
+    about: Report security problems privately.
