@@ -10,6 +10,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
+using EldoUI.Updater.Core;
 
 namespace EldoUI.Updater
 {
@@ -148,8 +149,15 @@ namespace EldoUI.Updater
 
 		static void MakeRunnable(string path)
 		{
-			File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
-				| UnixFileMode.GroupRead | UnixFileMode.GroupExecute | UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+			// Only the user may run or change it.
+			File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+		}
+
+		/// <summary>Opens a page on github.com in the browser; the app never opens any other address.</summary>
+		public static void OpenPage(string url)
+		{
+			if (!Release.IsGitHubPage(url)) { Log.Write("Refused to open a link that is not on github.com"); return; }
+			Open(url);
 		}
 
 		/// <summary>Opens a folder or link with the desktop's own handler.</summary>

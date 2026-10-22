@@ -2,6 +2,16 @@
 
 Each release of the EldoUI Updater. The newest is at the top.
 
+## [1.2.2] - 2026-10-22
+
+### New
+- The first time the window opens, a short notice explains what the updater does, that it only talks to GitHub, and how to turn off automatic installs or the start at login. It shows once.
+- Release files come with a build provenance record, so anyone can check that a download was built from this repository. The Windows exe is ready to be code-signed.
+
+### Improved
+- Links from the updater open only pages on GitHub.
+- On Linux, the installed AppImage can be run only by your own user.
+
 ## [1.2.1] - 2026-10-22
 
 ### New

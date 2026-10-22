@@ -5,7 +5,8 @@ name: build
 # self-test and pictures (artifact "snapshots-linux").
 # A push to main whose <Version> in src/Directory.Build.props is newer than the newest release also
 # publishes it: the release is made as a draft, gets the exe, the AppImage and their checksums, and is
-# only then published, so the updater never sees a half-finished release.
+# only then published, so the updater never sees a half-finished release. The exe is code-signed when the
+# repository has code signing set up (SIGNING.md), and public releases get build provenance for both files.
 
 on:
   pull_request:
@@ -27,6 +28,8 @@ jobs:
     defaults:
       run:
         shell: pwsh
+    env:
+      HAS_SIGNING: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -50,6 +53,39 @@ jobs:
 
       - name: Build the exe
         run: dotnet build src/EldoUI.Updater -c Release --nologo
+
+      # Code signing through SignPath (free for open-source projects), when the repository has it set up:
+      # the secret SIGNPATH_API_TOKEN and the variables SIGNPATH_ORGANIZATION_ID, SIGNPATH_PROJECT_SLUG and
+      # SIGNPATH_POLICY_SLUG. Without them the exe stays unsigned and nothing else changes.
+      - uses: actions/upload-artifact@v7
+        id: unsigned
+        if: env.HAS_SIGNING == 'true' && github.event_name != 'pull_request'
+        with:
+          name: EldoUI-Updater-unsigned
+          path: src/EldoUI.Updater/bin/Release/net48/EldoUI Updater.exe
+          retention-days: 1
+
+      - name: Sign the exe
+        if: env.HAS_SIGNING == 'true' && github.event_name != 'pull_request'
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+
+      - name: Use the signed exe
+        if: env.HAS_SIGNING == 'true' && github.event_name != 'pull_request'
+        run: |
+          $signed = Get-ChildItem signed -Recurse -Filter *.exe | Select-Object -First 1
+          if (-not $signed) { throw "the signed exe is missing" }
+          $sig = Get-AuthenticodeSignature $signed.FullName
+          if ($sig.Status -ne 'Valid') { throw "the signature is not valid: $($sig.Status)" }
+          Copy-Item $signed.FullName "src/EldoUI.Updater/bin/Release/net48/EldoUI Updater.exe" -Force
+          Write-Host "Signed by $($sig.SignerCertificate.Subject)"
 
       - name: Self-test on .NET Framework
         run: |
@@ -140,6 +176,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # Build provenance: a signed statement that this workflow built the release files.
+      id-token: write
+      attestations: write
     env:
       GH_TOKEN: ${{ github.token }}
       VERSION: ${{ needs.build.outputs.version }}
@@ -178,6 +217,15 @@ jobs:
           sed -i "s/\r$//" publish/SHA256SUMS.txt
           cat publish-linux/SHA256SUMS-linux.txt >> publish/SHA256SUMS.txt
           (cd publish && sha256sum -c SHA256SUMS.txt)
+
+      - name: Build provenance
+        # GitHub offers attestations for public repositories.
+        if: steps.guard.outputs.publish == 'true' && !github.event.repository.private
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            publish/EldoUI-Updater.exe
+            publish/EldoUI-Updater-x86_64.AppImage
 
       - name: Release notes
         if: steps.guard.outputs.publish == 'true'
