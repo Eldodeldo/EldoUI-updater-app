@@ -17,8 +17,8 @@ Nothing has to be set up for this; the workflow does it for every release.
 
 ## Code signing (Windows)
 
-The exe is signed through [SignPath](https://signpath.io), which signs open-source projects for free
-through the SignPath Foundation. Until then the exe is unsigned, and Windows SmartScreen shows "Windows
+The exe is to be signed through [SignPath](https://signpath.io), which signs open-source projects for free
+through the SignPath Foundation. Until that is in place the exe is unsigned, and Windows SmartScreen shows "Windows
 protected your PC" on the first start.
 
 Once signing is set up for this repository, every release exe is signed, and a release whose signature
