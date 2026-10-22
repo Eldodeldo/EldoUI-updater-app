@@ -1,0 +1,35 @@
+name: Updater problem
+description: Something in the EldoUI Updater does not work as expected.
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Updater version
+      description: Shown in the updater's window under "This app".
+      placeholder: "1.2.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: system
+    attributes:
+      label: System
+      options:
+        - Windows 11
+        - Windows 10
+        - Linux
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead. The status line in the window helps.
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log (optional)
+      description: The last lines of `updater.log` (Windows `%LOCALAPPDATA%\EldoUI Updater\`, Linux `~/.local/state/eldoui-updater/`). Remove anything personal, such as your user name in folder paths.
+      render: text
