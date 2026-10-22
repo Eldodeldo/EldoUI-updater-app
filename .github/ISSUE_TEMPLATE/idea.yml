@@ -1,0 +1,11 @@
+name: Idea
+description: Suggest an improvement to the EldoUI Updater.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: What should the updater do, and why would it help?
+    validations:
+      required: true
