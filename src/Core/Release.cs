@@ -90,6 +90,12 @@ namespace EldoUI.Updater.Core
 			return null;
 		}
 
+		/// <summary>The only pages the app opens in the browser: HTTPS pages on github.com.</summary>
+		public static bool IsGitHubPage(string url)
+		{
+			return IsGitHubDownload(url);
+		}
+
 		/// <summary>Only HTTPS downloads from github.com are followed.</summary>
 		public static bool IsGitHubDownload(string url)
 		{

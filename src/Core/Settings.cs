@@ -23,6 +23,8 @@ namespace EldoUI.Updater.Core
 		public string AnnouncedVersion = "";
 		public DateTime? LastCheck;
 		public bool Welcomed;
+		/// <summary>The one-time note on what runs by itself (start with the system, automatic updates) was shown.</summary>
+		public bool Introduced;
 		/// <summary>A newer version of the updater itself, and when it was first seen (found while the app runs, it installs 24 hours later; found at start, at once).</summary>
 		public string UpdaterSeenVersion = "";
 		public DateTime? UpdaterSeenAt;
@@ -40,6 +42,7 @@ namespace EldoUI.Updater.Core
 				s.Language = o.Str("language") ?? "auto";
 				s.AnnouncedVersion = o.Str("announcedVersion") ?? "";
 				s.Welcomed = o.Bool("welcomed");
+				s.Introduced = o.Bool("introduced");
 				var folders = o.Arr("installedFolders");
 				if (folders != null) s.InstalledFolders = folders.OfType<string>().ToList();
 				s.LastCheck = Time(o.Str("lastCheck"));
@@ -65,6 +68,7 @@ namespace EldoUI.Updater.Core
 				{ "announcedVersion", AnnouncedVersion ?? "" },
 				{ "lastCheck", Time(LastCheck) },
 				{ "welcomed", Welcomed },
+				{ "introduced", Introduced },
 				{ "updaterSeenVersion", UpdaterSeenVersion ?? "" },
 				{ "updaterSeenAt", Time(UpdaterSeenAt) },
 			};
