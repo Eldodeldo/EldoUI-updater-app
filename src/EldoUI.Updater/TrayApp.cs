@@ -168,6 +168,16 @@ namespace EldoUI.Updater
 			if (_form.WindowState == FormWindowState.Minimized) _form.WindowState = FormWindowState.Normal;
 			_form.Activate();
 			_form.BringToFront();
+			Introduce();
+		}
+
+		/// <summary>Once, the first time the window opens: what the updater does by itself, and where to turn it off.</summary>
+		void Introduce()
+		{
+			if (_settings.Introduced) return;
+			_settings.Introduced = true;
+			Save();
+			MessageBox.Show(_form, T.S("intro.body"), T.S("intro.title"), MessageBoxButtons.OK, MessageBoxIcon.Information);
 		}
 
 		void ApplyTexts()
@@ -534,7 +544,8 @@ namespace EldoUI.Updater
 
 		static void OpenUrl(string url)
 		{
-			if (!Release.IsGitHubDownload(url) && !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) return;
+			// Only pages on github.com: the app never opens any other address.
+			if (!Release.IsGitHubPage(url)) { Log.Write("Refused to open a link that is not on github.com"); return; }
 			try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); } catch { }
 		}
 

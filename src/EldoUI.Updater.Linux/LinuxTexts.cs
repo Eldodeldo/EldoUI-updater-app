@@ -19,6 +19,7 @@ namespace EldoUI.Updater
 				{ "folder.bad.title", "That is not a WoW: Forever folder" },
 				{ "folder.bad.body", "Choose the World of Warcraft folder that has a _forever_ folder in it (or _classic_beta_ for the beta), or the Wine prefix WoW runs in: the folder with drive_c in it." },
 				{ "uninstall.body", "The updater, its settings and its app menu entry are removed. EldoUI itself stays installed in the game." },
+				{ "intro.body", "It starts when you log in and installs new versions of EldoUI and of itself by itself. You can turn off \"Start when I log in\" and \"Install updates automatically\" in its window or tray menu at any time. It only talks to GitHub and sends nothing about you." },
 				{ "linux.notray", "The tray icon needs a panel with StatusNotifier support (on GNOME: the AppIndicator extension). The updater keeps working without it; open it from the app menu." },
 			}, new Dictionary<string, string>
 			{
@@ -31,6 +32,7 @@ namespace EldoUI.Updater
 				{ "folder.bad.title", "Det er ikke en WoW: Forever-mappe" },
 				{ "folder.bad.body", "Vælg den World of Warcraft-mappe, der har en _forever_-mappe (eller _classic_beta_ til betaen), eller den Wine-mappe WoW kører i: mappen med drive_c i." },
 				{ "uninstall.body", "Updateren, dens indstillinger og dens genvej i programmenuen fjernes. Selve EldoUI bliver i spillet." },
+				{ "intro.body", "Den starter, når du logger ind, og installerer selv nye versioner af EldoUI og af sig selv. Du kan altid slå \"Start når jeg logger ind\" og \"Installér opdateringer automatisk\" fra i dens vindue eller menu. Den taler kun med GitHub og sender intet om dig." },
 				{ "linux.notray", "Bakke-ikonet kræver et panel med StatusNotifier (på GNOME: udvidelsen AppIndicator). Updateren virker også uden; åbn den fra programmenuen." },
 			});
 		}

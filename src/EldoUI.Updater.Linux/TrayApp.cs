@@ -67,7 +67,7 @@ namespace EldoUI.Updater
 			_miCheck = Item(() => Check(true, false));
 			_miSelf = Item(() => InstallApp());
 			_miAppCheck = Item(() => CheckAppNow());
-			_miNotes = Item(() => Setup.Open(_last != null && _last.Release != null ? _last.Release.PageUrl : ReleasesUrl));
+			_miNotes = Item(() => Setup.OpenPage(_last != null && _last.Release != null ? _last.Release.PageUrl : ReleasesUrl));
 			_miFolder = Item(() => _ = ChooseFolder());
 			_miAddOns = Item(OpenAddOns);
 			_miAuto = Item(() => SetAutoInstall(!_settings.AutoInstall));
@@ -81,7 +81,7 @@ namespace EldoUI.Updater
 			_miLangDa.Header = "Dansk";
 			foreach (var m in new[] { _miLangAuto, _miLangEn, _miLangDa }) m.ToggleType = NativeMenuItemToggleType.Radio;
 			_miLang = new NativeMenuItem { Menu = new NativeMenu { _miLangAuto, _miLangEn, _miLangDa } };
-			_miSite = Item(() => Setup.Open(SiteUrl));
+			_miSite = Item(() => Setup.OpenPage(SiteUrl));
 			_miExit = Item(Exit);
 			_menu = new NativeMenu
 			{
@@ -136,6 +136,16 @@ namespace EldoUI.Updater
 			_form.Show();
 			if (_form.WindowState == WindowState.Minimized) _form.WindowState = WindowState.Normal;
 			_form.Activate();
+			Introduce();
+		}
+
+		/// <summary>Once, the first time the window opens: what the updater does by itself, and where to turn it off.</summary>
+		void Introduce()
+		{
+			if (_settings.Introduced) return;
+			_settings.Introduced = true;
+			Save();
+			Notify(T.S("intro.title"), T.S("intro.body"));
 		}
 
 		void ApplyTexts()

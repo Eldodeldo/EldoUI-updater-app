@@ -21,8 +21,9 @@ EldoUI settings stay as they are.
 3. That is all. It installs EldoUI if it is missing, and every new version after that. Type `/reload` in
    the game if it is open.
 
-Windows SmartScreen may say "Windows protected your PC" the first time, because the exe is not code-signed
-yet. Click **More info → Run anyway**. Every release lists the files' SHA-256 checksums in `SHA256SUMS.txt`.
+Windows SmartScreen may say "Windows protected your PC" the first time while the exe is not code-signed.
+Click **More info → Run anyway**. Every release lists the files' SHA-256 checksums in `SHA256SUMS.txt`, and
+you can check that a file was built by this repository (see [SIGNING.md](SIGNING.md)).
 
 **Linux**
 
@@ -65,7 +66,10 @@ off), start with Windows or at login (on or off), language (English or Danish), 
   `github.com`. No account, no token, no telemetry, nothing about you or your PC.
 - **Reads:** where your games are (Battle.net's settings and installed-games list, the registry on
   Windows, Wine prefixes on Linux), and the `.toc` of the installed EldoUI to know its version.
-- **Writes:** EldoUI's folders in AddOns, and its own files:
+- **Opens:** only pages on `github.com` (release notes, EldoUI on GitHub). Any other link is refused.
+- **First start:** a short notice says what the updater does and how to turn its automatic parts off.
+- **Writes:** EldoUI's folders in AddOns, and its own files (on Linux, the installed AppImage is runnable
+  only by your user):
 
 | What | Windows | Linux |
 | --- | --- | --- |

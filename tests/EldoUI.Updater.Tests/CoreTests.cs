@@ -145,6 +145,20 @@ namespace EldoUI.Updater.Tests
 			Assert.Equal("abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789", zip.Sha256);
 		}
 
+		[Theory]
+		[InlineData("https://github.com/Eldodeldo/EldoUI", true)]
+		[InlineData("https://github.com/Eldodeldo/EldoUI/releases/latest", true)]
+		[InlineData("http://github.com/Eldodeldo/EldoUI", false)]
+		[InlineData("https://github.com.example.com/x", false)]
+		[InlineData("https://example.com/", false)]
+		[InlineData("file:///C:/Windows/System32/calc.exe", false)]
+		[InlineData("", false)]
+		[InlineData(null, false)]
+		public void OpensOnlyGitHubPages(string url, bool allowed)
+		{
+			Assert.Equal(allowed, Release.IsGitHubPage(url));
+		}
+
 		[Fact]
 		public void IgnoresDownloadsThatAreNotFromGitHub()
 		{
@@ -563,7 +577,7 @@ namespace EldoUI.Updater.Tests
 			using (var t = new TempDir())
 			{
 				string path = t.Sub("data", "settings.json");
-				var s = new Settings { AddOnsDir = @"C:\WoW\_classic_beta_\Interface\AddOns", AutoInstall = false, Language = "da", LastCheck = new DateTime(2026, 10, 21, 12, 0, 0, DateTimeKind.Utc) };
+				var s = new Settings { AddOnsDir = @"C:\WoW\_classic_beta_\Interface\AddOns", AutoInstall = false, Language = "da", Introduced = true, LastCheck = new DateTime(2026, 10, 21, 12, 0, 0, DateTimeKind.Utc) };
 				s.InstalledFolders.AddRange(new[] { "EldoUI", "EldoUI_LootData" });
 				s.Save(path);
 				s.Save(path);
@@ -571,6 +585,8 @@ namespace EldoUI.Updater.Tests
 				Assert.Equal(s.AddOnsDir, b.AddOnsDir);
 				Assert.False(b.AutoInstall);
 				Assert.Equal("da", b.Language);
+				Assert.True(b.Introduced);
+				Assert.False(new Settings().Introduced);
 				Assert.Equal(s.InstalledFolders, b.InstalledFolders);
 				Assert.Equal(s.LastCheck, b.LastCheck.Value.ToUniversalTime());
 			}
