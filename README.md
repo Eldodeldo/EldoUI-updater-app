@@ -41,6 +41,9 @@ On GNOME, the tray icon needs the *AppIndicator and KStatusNotifierItem Support*
 Without a tray the window opens instead. If the AppImage mentions FUSE, install your distribution's `fuse3`
 package.
 
+The **This app** row also has a **Check update** button. It shows **Checking…** during a request
+and becomes **Update now** when a newer updater is ready.
+
 ## The menu
 
 Right-click the troll icon: check for updates now, check for an app update (it always tells you what it

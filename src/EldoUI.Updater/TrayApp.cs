@@ -77,6 +77,7 @@ namespace EldoUI.Updater
 			_form.DetailsClicked += () => OpenUrl(Release.DetailsPage);
 
 			_form.AppUpdateClicked += () => InstallApp();
+			_form.AppCheckClicked += CheckAppNow;
 
 			_menu = new ContextMenuStrip { Renderer = new MenuRenderer(), ShowImageMargin = false, ShowCheckMargin = true, Font = Theme.Body(9.5f), ForeColor = Theme.Text, BackColor = Theme.Panel };
 			_miStatus = new ToolStripMenuItem { Enabled = false, Tag = "head" };
@@ -348,6 +349,7 @@ namespace EldoUI.Updater
 				AppNew = _app != null ? _app.Version : null,
 				AppAt = _app != null ? (DateTime?)_appAt : null,
 				AppBusy = _appBusy,
+				AppChecking = _appChecking,
 			};
 			if (string.IsNullOrEmpty(_settings.AddOnsDir))
 			{
@@ -408,7 +410,7 @@ namespace EldoUI.Updater
 		/// </summary>
 		async Task CheckApp(bool booting)
 		{
-			if (!_settings.SelfUpdate || _appBusy) return;
+			if (!_settings.SelfUpdate || _appBusy || _appChecking) return;
 			var result = await _engine.CheckUpdaterAsync(Setup.Version, _quit.Token);
 			if (result.Outcome == AppCheckOutcome.Unreachable) return;
 			var r = result.Outcome == AppCheckOutcome.Newer ? result.Release : null;
@@ -435,6 +437,7 @@ namespace EldoUI.Updater
 		{
 			if (_appBusy || _appChecking) return;
 			_appChecking = true;
+			UpdateView(_last);
 			AppCheckResult r;
 			try
 			{
@@ -443,6 +446,7 @@ namespace EldoUI.Updater
 			finally
 			{
 				_appChecking = false;
+				UpdateView(_last);
 			}
 			if (_quit.IsCancellationRequested) return;
 			IWin32Window owner = _form.Visible ? _form : null;

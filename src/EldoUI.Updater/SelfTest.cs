@@ -53,6 +53,20 @@ namespace EldoUI.Updater
 					form.DetailsClicked += () => details = true;
 					form.CompanionChanged += (id, selected) => uncheckedDbm = id == "dbm" && !selected;
 					form.Show();
+					int appChecks = 0, appUpdates = 0;
+					form.AppCheckClicked += () => appChecks++;
+					form.AppUpdateClicked += () => appUpdates++;
+					var appButton = (Button) typeof(MainForm).GetField("_appUpdate", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(form);
+					check(appButton.Visible && appButton.Enabled && appButton.Text == T.S("btn.app_check"), "the app version always has a manual check button");
+					appButton.PerformClick();
+					form.Render(new ViewState { AppChecking = true });
+					appButton.PerformClick();
+					check(appChecks == 1 && !appButton.Enabled && appButton.Text == T.S("btn.app_checking"), "an active app check disables duplicate clicks");
+					form.Render(new ViewState { AppNew = "9.9.9" });
+					appButton.PerformClick();
+					check(appUpdates == 1 && appChecks == 1 && appButton.Text == T.S("btn.update"), "the same app button switches to Update now");
+					form.Render(new ViewState { ExtraAddons = true, SelectedCompanions = new[] { "dbm" } });
+
 					var show = typeof(MainForm).GetMethod("ShowCompanions", BindingFlags.Instance | BindingFlags.NonPublic);
 					show.Invoke(form, null);
 					var menu = (ContextMenuStrip) typeof(MainForm).GetField("_companionMenu", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(form);

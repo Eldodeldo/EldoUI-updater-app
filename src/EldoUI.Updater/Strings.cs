@@ -40,6 +40,8 @@ namespace EldoUI.Updater
 
 		static readonly Dictionary<string, string> En = new Dictionary<string, string>
 		{
+			{ "btn.app_check", "Check update" },
+			{ "btn.app_checking", "Checking…" },
 			{ "extras.install_selected", "Install selected addons" },
 			{ "extras.install_all", "Install all EldoUI recommended" },
 			{ "extras.details", "Details! — open CurseForge (manual install)" },
@@ -131,6 +133,8 @@ namespace EldoUI.Updater
 
 		static readonly Dictionary<string, string> Da = new Dictionary<string, string>
 		{
+			{ "btn.app_check", "Tjek opdatering" },
+			{ "btn.app_checking", "Tjekker…" },
 			{ "extras.install_selected", "Installér valgte addons" },
 			{ "extras.install_all", "Installér alle EldoUI-anbefalinger" },
 			{ "extras.details", "Details! — åbn CurseForge (manuel installation)" },

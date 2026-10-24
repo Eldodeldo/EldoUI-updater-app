@@ -75,6 +75,7 @@ namespace EldoUI.Updater
 			_form.DetailsClicked += () => Setup.OpenPage(Release.DetailsPage);
 
 			_form.AppUpdateClicked += () => InstallApp();
+			_form.AppCheckClicked += CheckAppNow;
 
 			_miStatus = new NativeMenuItem { IsEnabled = false };
 			_miOpen = Item(() => ShowWindow());
@@ -341,6 +342,7 @@ namespace EldoUI.Updater
 				AppNew = _app != null ? _app.Version : null,
 				AppAt = _app != null ? (DateTime?)_appAt : null,
 				AppBusy = _appBusy,
+				AppChecking = _appChecking,
 			};
 			if (string.IsNullOrEmpty(_settings.AddOnsDir))
 			{
@@ -400,7 +402,7 @@ namespace EldoUI.Updater
 		/// </summary>
 		async Task CheckApp(bool booting)
 		{
-			if (!_settings.SelfUpdate || _appBusy) return;
+			if (!_settings.SelfUpdate || _appBusy || _appChecking) return;
 			var result = await _engine.CheckUpdaterAsync(Setup.Version, _quit.Token, UpdateEngine.LinuxUpdaterAssetPattern);
 			if (result.Outcome == AppCheckOutcome.Unreachable) return;
 			var r = result.Outcome == AppCheckOutcome.Newer ? result.Release : null;
@@ -428,6 +430,7 @@ namespace EldoUI.Updater
 		{
 			if (_appBusy || _appChecking) return;
 			_appChecking = true;
+			UpdateView(_last);
 			AppCheckResult r;
 			try
 			{
@@ -436,6 +439,7 @@ namespace EldoUI.Updater
 			finally
 			{
 				_appChecking = false;
+				UpdateView(_last);
 			}
 			if (_quit.IsCancellationRequested) return;
 			switch (r.Outcome)

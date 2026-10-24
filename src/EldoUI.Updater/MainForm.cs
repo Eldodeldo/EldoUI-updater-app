@@ -30,11 +30,12 @@ namespace EldoUI.Updater
 		public string AppNew;
 		public DateTime? AppAt;
 		public bool AppBusy;
+		public bool AppChecking;
 	}
 
 	sealed class MainForm : Form
 	{
-		public event Action CheckClicked, UpdateClicked, ChooseFolderClicked, OpenAddOnsClicked, AppUpdateClicked;
+		public event Action CheckClicked, UpdateClicked, ChooseFolderClicked, OpenAddOnsClicked, AppUpdateClicked, AppCheckClicked;
 		public event Action<bool> AutostartChanged, AutoInstallChanged;
 		public event Action<string, bool> CompanionChanged;
 		public event Action<bool> InstallExtrasClicked;
@@ -42,10 +43,10 @@ namespace EldoUI.Updater
 		public bool AllowClose;
 
 		readonly Image _logo;
-		readonly Label _status, _installed, _latest, _folder, _checked, _app, _appUpdate, _footer;
+		readonly Label _status, _installed, _latest, _folder, _checked, _app, _footer;
 		readonly Label[] _labels = new Label[5];
 		readonly ECheck _autostart, _autoInstall;
-		readonly EButton _extras;
+		readonly EButton _extras, _appUpdate;
 		readonly EButton _primary, _chooseFolder, _openAddOns;
 		readonly Font _head, _tag, _body, _small, _link;
 		readonly ToolTip _tips = new ToolTip();
@@ -95,9 +96,12 @@ namespace EldoUI.Updater
 			_folder = values[2];
 			_checked = values[3];
 			_app = values[4];
-			// "Update now" beside the app's own version, shown only when a newer one is out.
-			_appUpdate = new Label { Location = new Point(340, 266), Size = new Size(110, 22), ForeColor = Theme.Accent, Font = _link, Cursor = Cursors.Hand, TextAlign = ContentAlignment.TopRight, Visible = false };
-			_appUpdate.Click += (s, e) => { if (AppUpdateClicked != null && !_state.AppBusy) AppUpdateClicked(); };
+			// The app version always has a check or update action beside it.
+			_appUpdate = new EButton { Location = new Point(340, 264), Size = new Size(110, 26) };
+			_appUpdate.Click += (sender, args) => {
+				if (_state.AppBusy || _state.AppChecking) return;
+				if (_state.AppNew == null) AppCheckClicked?.Invoke(); else AppUpdateClicked?.Invoke();
+			};
 			Controls.Add(_appUpdate);
 			_appUpdate.BringToFront();
 
@@ -227,8 +231,10 @@ namespace EldoUI.Updater
 				_checked.Text = Ago(s.LastCheck);
 				_app.Text = AppText(s);
 				_app.ForeColor = s.AppNew != null ? Theme.Accent : Theme.Text;
-				_app.Width = s.AppNew != null && !s.AppBusy ? 200 : 310;
-				_appUpdate.Visible = s.AppNew != null && !s.AppBusy;
+				_app.Width = 188;
+				_appUpdate.Visible = true;
+				_appUpdate.Enabled = !s.AppBusy && !s.AppChecking;
+				_appUpdate.Text = T.S(s.AppChecking ? "btn.app_checking" : s.AppNew == null ? "btn.app_check" : "btn.update");
 				_autostart.Checked = s.Autostart;
 				_autoInstall.Checked = s.AutoInstall;
 				_extras.Enabled = !s.Busy;
