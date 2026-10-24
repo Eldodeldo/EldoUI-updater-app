@@ -2,6 +2,11 @@
 
 Each release of the EldoUI Updater. The newest is at the top.
 
+## [Unreleased]
+
+### Fixed
+- Keep addon downloads matched to the selected release and leave the installed addon unchanged if the zip contains another version.
+
 ## [1.2.6] - 2026-10-24
 
 ### New

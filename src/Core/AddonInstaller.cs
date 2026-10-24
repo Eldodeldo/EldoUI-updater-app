@@ -70,8 +70,9 @@ namespace EldoUI.Updater.Core
 		/// <summary>
 		/// Installs the zip into addOnsDir. previousFolders are the folders the last install put there:
 		/// any of them the new release no longer has is removed. Other folders are never touched.
+		/// When expectedVersion is given, the staged main TOC must match it before installed folders move.
 		/// </summary>
-		public static InstallResult Install(string zipPath, string addOnsDir, IEnumerable<string> previousFolders)
+		public static InstallResult Install(string zipPath, string addOnsDir, IEnumerable<string> previousFolders, string expectedVersion = null)
 		{
 			if (!Directory.Exists(addOnsDir)) Directory.CreateDirectory(addOnsDir);
 			string addOns = Path.GetFullPath(addOnsDir);
@@ -102,6 +103,9 @@ namespace EldoUI.Updater.Core
 					}
 				}
 				result.Version = ReadTocVersion(Path.Combine(fresh, MainFolder, MainFolder + ".toc"));
+				if (expectedVersion != null && (Versions.Clean(expectedVersion) == null
+					|| !string.Equals(result.Version, Versions.Clean(expectedVersion), StringComparison.Ordinal)))
+					throw new InvalidDataException("The zip's EldoUI version does not match the selected release (expected " + expectedVersion + ").");
 
 				var remove = (previousFolders ?? Enumerable.Empty<string>())
 					.Where(f => f != null && FolderName.IsMatch(f) && !result.Folders.Contains(f)).Distinct().ToList();
