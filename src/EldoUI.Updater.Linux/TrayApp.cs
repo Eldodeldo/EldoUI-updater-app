@@ -372,12 +372,12 @@ namespace EldoUI.Updater
 		async Task CheckApp(bool booting)
 		{
 			if (!_settings.SelfUpdate || _appBusy) return;
-			var r = await _engine.NewerUpdaterAsync(Setup.Version, _quit.Token, UpdateEngine.LinuxUpdaterAssetPattern);
+			var result = await _engine.CheckUpdaterAsync(Setup.Version, _quit.Token, UpdateEngine.LinuxUpdaterAssetPattern);
+			if (result.Outcome == AppCheckOutcome.Unreachable) return;
+			var r = result.Outcome == AppCheckOutcome.Newer ? result.Release : null;
 			if (r == null)
 			{
-				// Also when GitHub could not be reached: a version already seen keeps its place.
-				bool reached = _last != null && _last.Outcome != CheckOutcome.Offline && _last.Outcome != CheckOutcome.Failed;
-				if (_app == null && reached && SelfUpdatePolicy.Clear(_settings)) Save();
+				if (_app == null && SelfUpdatePolicy.Clear(_settings)) Save();
 				return;
 			}
 			bool first = _app == null || _app.Version != r.Version;
