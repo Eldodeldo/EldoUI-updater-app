@@ -63,7 +63,19 @@ namespace EldoUI.Updater
 			_form.OpenAddOnsClicked += OpenAddOns;
 			_form.AutostartChanged += on => SetAutostart(on);
 			_form.AutoInstallChanged += on => SetAutoInstall(on);
-			_form.ExtraAddonsChanged += on => { _settings.ExtraAddons = on; Save(); UpdateView(_last); if (on) Check(true, false); };
+
+			_form.CompanionChanged += (id, on) => {
+				if (_engine.Busy) return;
+				_settings.SelectCompanion(id, on);
+				Save(); UpdateView(null);
+			};
+			_form.InstallExtrasClicked += all => {
+				if (_engine.Busy) return;
+				if (all) { _settings.SelectedCompanions = Companion.All.Select(a => a.Id).ToList(); _settings.ExtraAddons = true; }
+				Save(); Check(true, false, true);
+			};
+			_form.DetailsClicked += () => OpenUrl(Release.DetailsPage);
+
 			_form.AppUpdateClicked += () => InstallApp();
 
 			_menu = new ContextMenuStrip { Renderer = new MenuRenderer(), ShowImageMargin = false, ShowCheckMargin = true, Font = Theme.Body(9.5f), ForeColor = Theme.Text, BackColor = Theme.Panel };
@@ -218,7 +230,7 @@ namespace EldoUI.Updater
 		}
 
 		/// <summary>Checks for a new EldoUI. user: the player asked (show the result in the window). install: install even if automatic install is off.</summary>
-		async void Check(bool user, bool install)
+		async void Check(bool user, bool install, bool installExtras = false)
 		{
 			if (_engine.Busy)
 			{
@@ -243,7 +255,7 @@ namespace EldoUI.Updater
 			CheckResult r;
 			try
 			{
-				r = await _engine.CheckAsync(_settings, install, _quit.Token);
+				r = await _engine.CheckAsync(_settings, install, _quit.Token, installExtras);
 			}
 			catch (OperationCanceledException)
 			{
@@ -332,6 +344,7 @@ namespace EldoUI.Updater
 				Autostart = Setup.Autostart,
 				AutoInstall = _settings.AutoInstall,
 				ExtraAddons = _settings.ExtraAddons,
+				SelectedCompanions = _settings.SelectedCompanions.ToArray(),
 				AppNew = _app != null ? _app.Version : null,
 				AppAt = _app != null ? (DateTime?)_appAt : null,
 				AppBusy = _appBusy,
@@ -578,7 +591,7 @@ namespace EldoUI.Updater
 		static void OpenUrl(string url)
 		{
 			// Only pages on github.com: the app never opens any other address.
-			if (!Release.IsGitHubPage(url)) { Log.Write("Refused to open a link that is not on github.com"); return; }
+			if (!Release.IsAllowedPage(url)) { Log.Write("Refused to open an unapproved page"); return; }
 			try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); } catch { }
 		}
 

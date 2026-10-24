@@ -56,7 +56,7 @@ namespace EldoUI.Updater.Core
 		{
 			var results = new List<CompanionResult>();
 			if (!settings.ExtraAddons) return results;
-			foreach (var addon in Companion.All)
+			foreach (var addon in Companion.All.Where(a => settings.SelectedCompanions.Contains(a.Id)))
 			{
 				ct.ThrowIfCancellationRequested();
 				var result = new CompanionResult { Name = addon.Name };

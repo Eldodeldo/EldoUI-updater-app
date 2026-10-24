@@ -187,6 +187,35 @@ namespace EldoUI.Updater.Tests
 		}
 
 		[Fact]
+		public async Task OnlySelectedCompanionIsFetched()
+		{
+			using (var t = new TempDir())
+			{
+				var settings = new Settings { AddOnsDir = t.Sub("AddOns") };
+				settings.SelectCompanion("media", true);
+				Assert.Equal(new[] { "media" }, settings.SelectedCompanions);
+				var results = await new CompanionUpdater(Serve(t), t.Sub("temp")).CheckAsync(settings, true, CancellationToken.None);
+				Assert.Single(results);
+				Assert.Equal("WeakAuras SharedMedia", results[0].Name);
+				Assert.False(Directory.Exists(Path.Combine(settings.AddOnsDir, "DBM-Core")));
+				settings.SelectCompanion("media", false);
+				Assert.False(settings.ExtraAddons);
+				Assert.Empty(settings.SelectedCompanions);
+				Assert.True(Directory.Exists(Path.Combine(settings.AddOnsDir, "WeakAuras_SharedMedia")));
+			}
+		}
+
+		[Fact]
+		public void DetailsIsAnAllowedPageButNeverAnUpdaterDownload()
+		{
+			Assert.True(Release.IsAllowedPage(Release.DetailsPage));
+			Assert.False(Release.IsGitHubDownload(Release.DetailsPage));
+			Assert.False(Release.IsAllowedPage(Release.DetailsPage + "?redirect=other"));
+			Assert.False(Release.IsAllowedPage("https://www.curseforge.com/another"));
+			Assert.False(Release.IsAllowedPage("https://www.curseforge.com.attacker.test/wow/addons/details"));
+		}
+
+		[Fact]
 		public void CompanionSettingsRoundTrip()
 		{
 			using (var t = new TempDir())
@@ -197,6 +226,7 @@ namespace EldoUI.Updater.Tests
 				s.Save(t.Sub("settings.json"));
 				var restored = Settings.Load(t.Sub("settings.json"));
 				Assert.True(restored.ExtraAddons);
+				Assert.Equal(s.SelectedCompanions, restored.SelectedCompanions);
 				Assert.Equal("v1.0", restored.ExtraVersions["rxp"]);
 				Assert.Equal(s.ExtraFiles["rxp"], restored.ExtraFiles["rxp"]);
 			}

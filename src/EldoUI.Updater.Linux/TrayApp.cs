@@ -61,7 +61,19 @@ namespace EldoUI.Updater
 			_form.OpenAddOnsClicked += OpenAddOns;
 			_form.AutostartChanged += SetAutostart;
 			_form.AutoInstallChanged += SetAutoInstall;
-			_form.ExtraAddonsChanged += on => { _settings.ExtraAddons = on; Save(); UpdateView(_last); if (on) Check(true, false); };
+
+			_form.CompanionChanged += (id, on) => {
+				if (_engine.Busy) return;
+				_settings.SelectCompanion(id, on);
+				Save(); UpdateView(null);
+			};
+			_form.InstallExtrasClicked += all => {
+				if (_engine.Busy) return;
+				if (all) { _settings.SelectedCompanions = Companion.All.Select(a => a.Id).ToList(); _settings.ExtraAddons = true; }
+				Save(); Check(true, false, true);
+			};
+			_form.DetailsClicked += () => Setup.OpenPage(Release.DetailsPage);
+
 			_form.AppUpdateClicked += () => InstallApp();
 
 			_miStatus = new NativeMenuItem { IsEnabled = false };
@@ -213,7 +225,7 @@ namespace EldoUI.Updater
 		}
 
 		/// <summary>Checks for a new EldoUI. user: the player asked. install: install even if automatic install is off.</summary>
-		async void Check(bool user, bool install)
+		async void Check(bool user, bool install, bool installExtras = false)
 		{
 			if (_engine.Busy)
 			{
@@ -237,7 +249,7 @@ namespace EldoUI.Updater
 			CheckResult r;
 			try
 			{
-				r = await _engine.CheckAsync(_settings, install, _quit.Token);
+				r = await _engine.CheckAsync(_settings, install, _quit.Token, installExtras);
 			}
 			catch (OperationCanceledException)
 			{
@@ -325,6 +337,7 @@ namespace EldoUI.Updater
 				Autostart = Setup.Autostart,
 				AutoInstall = _settings.AutoInstall,
 				ExtraAddons = _settings.ExtraAddons,
+				SelectedCompanions = _settings.SelectedCompanions.ToArray(),
 				AppNew = _app != null ? _app.Version : null,
 				AppAt = _app != null ? (DateTime?)_appAt : null,
 				AppBusy = _appBusy,

@@ -28,6 +28,7 @@ namespace EldoUI.Updater
 		public bool Autostart;
 		public bool AutoInstall;
 		public bool ExtraAddons;
+		public string[] SelectedCompanions = new string[0];
 		public string ExtraStatus;
 		public string AppNew;
 		public DateTime? AppAt;
@@ -60,7 +61,10 @@ namespace EldoUI.Updater
 	sealed class MainWindow : Window
 	{
 		public event Action CheckClicked, UpdateClicked, ChooseFolderClicked, OpenAddOnsClicked, AppUpdateClicked;
-		public event Action<bool> AutostartChanged, AutoInstallChanged, ExtraAddonsChanged;
+		public event Action<bool> AutostartChanged, AutoInstallChanged;
+		public event Action<string, bool> CompanionChanged;
+		public event Action<bool> InstallExtrasClicked;
+		public event Action DetailsClicked;
 		public bool AllowClose;
 
 		readonly Canvas _canvas = new Canvas { Width = 470, Height = 482 };
@@ -68,7 +72,8 @@ namespace EldoUI.Updater
 		readonly TextBlock[] _labels = new TextBlock[5];
 		readonly TextBlock _installed, _latest, _folder, _checked, _app;
 		readonly Ellipse _dot, _halo;
-		readonly CheckBox _autostart, _autoInstall, _extras;
+		readonly CheckBox _autostart, _autoInstall;
+		readonly Button _extras;
 		readonly Button _primary, _chooseFolder, _openAddOns;
 		ViewState _state = new ViewState();
 		bool _rendering;
@@ -153,8 +158,9 @@ namespace EldoUI.Updater
 			_autoInstall.IsCheckedChanged += (s, e) => { if (!_rendering && AutoInstallChanged != null) AutoInstallChanged(_autoInstall.IsChecked == true); };
 			Place(_autostart, 18, 302);
 			Place(_autoInstall, 18, 330);
-			_extras = Check();
-			_extras.IsCheckedChanged += (sender, args) => { if (!_rendering) ExtraAddonsChanged?.Invoke(_extras.IsChecked == true); };
+			_extras = MakeButton(428, false);
+			_extras.Height = 28;
+			_extras.Click += (sender, args) => ShowCompanions();
 			Place(_extras, 18, 358);
 
 			// Actions: one gold main button, two quiet ones.
@@ -270,6 +276,31 @@ namespace EldoUI.Updater
 			}
 		}
 
+		void ShowCompanions()
+		{
+			var items = new System.Collections.Generic.List<object>();
+			foreach (var addon in Core.Companion.All)
+			{
+				var chosen = _state.ExtraAddons && Array.IndexOf(_state.SelectedCompanions, addon.Id) >= 0;
+				var item = new MenuItem { Header = addon.Name, ToggleType = MenuItemToggleType.CheckBox, IsChecked = chosen };
+				item.Click += (sender, args) => CompanionChanged?.Invoke(addon.Id, !chosen);
+				items.Add(item);
+			}
+			items.Add(new Separator());
+			var selected = new MenuItem { Header = T.S("extras.install_selected"), IsEnabled = _state.ExtraAddons };
+			selected.Click += (sender, args) => InstallExtrasClicked?.Invoke(false);
+			items.Add(selected);
+			var all = new MenuItem { Header = T.S("extras.install_all") };
+			all.Click += (sender, args) => InstallExtrasClicked?.Invoke(true);
+			items.Add(all);
+			items.Add(new Separator());
+			var details = new MenuItem { Header = T.S("extras.details") };
+			details.Click += (sender, args) => DetailsClicked?.Invoke();
+			items.Add(details);
+			var menu = new ContextMenu { ItemsSource = items };
+			menu.Open(_extras);
+		}
+
 		public void ApplyTexts()
 		{
 			Title = T.S("app");
@@ -306,7 +337,6 @@ namespace EldoUI.Updater
 				_appUpdate.IsVisible = s.AppNew != null && !s.AppBusy;
 				_autostart.IsChecked = s.Autostart;
 				_autoInstall.IsChecked = s.AutoInstall;
-				_extras.IsChecked = s.ExtraAddons;
 				_extras.IsEnabled = !s.Busy;
 				ToolTip.SetTip(_extras, s.ExtraStatus ?? T.S("extras.hint"));
 				_primary.Content = T.S(s.Action == MainAction.ChooseFolder ? "btn.folder"

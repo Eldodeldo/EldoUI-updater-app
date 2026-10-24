@@ -65,7 +65,7 @@ off), start with Windows or at login (on or off), language (English or Danish), 
   `github.com`. No account, no token, no telemetry, nothing about you or your PC.
 - **Reads:** where your games are (Battle.net's settings and installed-games list, the registry on
   Windows, Wine prefixes on Linux), the `.toc` of the installed EldoUI to know its version, and explicitly enabled companion folders to preserve their existing files during updates.
-- **Opens:** only pages on `github.com` (release notes, EldoUI on GitHub). Any other link is refused.
+- **Opens:** pages on `github.com` and the exact Details! CurseForge project page for manual installation. Other external pages are refused.
 - **First start:** a short notice says what the updater does and how to turn its automatic parts off.
 - **Writes:** EldoUI's folders and explicitly enabled companion folders in AddOns, and its own files (on Linux, the installed AppImage is runnable
   only by your user):
@@ -115,11 +115,11 @@ Blizzard Entertainment, Inc.
 
 ## Optional companion addons (1.2.4)
 
-Turn on **Add the extra addons** in the updater window to include **DBM**, **RestedXP** and
-**WeakAuras SharedMedia** in normal checks. It is off by default. Automatic installation follows
+Open **Extra addons…** in the updater window and check **DBM**, **RestedXP** or
+**WeakAuras SharedMedia** individually. Use **Install selected addons**, or **Install all EldoUI recommended**
+to select and install all three at once. They are not managed until you choose them. Automatic installation follows
 **Install updates automatically**; when that is off, **Update now** applies available updates.
-Point at the companion option for each addon's result and failure details. Turning it off stops
-checking those addons and leaves them installed.
+Point at the companion option for each addon's result and failure details. Removing a checkmark stops managing that addon and leaves it installed.
 
 Packages come directly from the publishers' GitHub releases. Both the compatibility manifest and
 package need published SHA-256 checksums, and the manifest must explicitly list the Forever flavor.
@@ -129,7 +129,7 @@ managed by this updater are removed when the next package drops them. Failed pla
 old folders; a failed restoration retains its backup instead of deleting it. Symlinked addon trees
 are refused. No game WTF data is changed and no third-party files are bundled or republished.
 
-Details! is intentionally not managed: install and update it separately with the CurseForge app.
+The menu also links to the Details! CurseForge project page. Details! is intentionally not managed: install and update it separately with the CurseForge app.
 There is no CurseForge API integration, account requirement or API key.
 
 Upstream sources: [DBM](https://github.com/DeadlyBossMods/DeadlyBossMods/releases),

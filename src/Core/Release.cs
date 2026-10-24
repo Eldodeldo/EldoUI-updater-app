@@ -90,6 +90,12 @@ namespace EldoUI.Updater.Core
 			return null;
 		}
 
+		public const string DetailsPage = "https://www.curseforge.com/wow/addons/details";
+		public static bool IsAllowedPage(string url)
+		{
+			return IsGitHubPage(url) || string.Equals(url, DetailsPage, StringComparison.Ordinal);
+		}
+
 		/// <summary>The only pages the app opens in the browser: HTTPS pages on github.com.</summary>
 		public static bool IsGitHubPage(string url)
 		{
