@@ -35,6 +35,7 @@ namespace EldoUI.Updater.Core
 		public Release Release;
 		public string Error;
 		public InstallResult Install;
+		public System.Collections.Generic.List<CompanionResult> Companions;
 	}
 
 	public sealed class UpdateEngine
@@ -72,12 +73,12 @@ namespace EldoUI.Updater.Core
 		}
 
 		/// <summary>Looks for a new EldoUI and installs it when install is true (or settings say so).</summary>
-		public async Task<CheckResult> CheckAsync(Settings settings, bool forceInstall, CancellationToken ct)
+		public async Task<CheckResult> CheckAsync(Settings settings, bool forceInstall, CancellationToken ct, bool installCompanions = false)
 		{
 			await _gate.WaitAsync(ct).ConfigureAwait(false);
+			var r = new CheckResult();
 			try
 			{
-				var r = new CheckResult();
 				try
 				{
 					r.Installed = AddonInstaller.InstalledVersion(settings.AddOnsDir);
@@ -149,7 +150,15 @@ namespace EldoUI.Updater.Core
 			}
 			finally
 			{
-				_gate.Release();
+				try
+				{
+					if (settings.ExtraAddons && WowFolders.Rank(settings.AddOnsDir) != int.MaxValue
+						&& Directory.Exists(Path.GetDirectoryName(Path.GetDirectoryName(settings.AddOnsDir.TrimEnd('\\', '/'))))
+						&& r.Outcome != CheckOutcome.NoFolder && r.Outcome != CheckOutcome.Failed
+						&& r.Outcome != CheckOutcome.Offline && !ct.IsCancellationRequested)
+						r.Companions = await new CompanionUpdater(_web, _tempDir).CheckAsync(settings, installCompanions || forceInstall || settings.AutoInstall, ct).ConfigureAwait(false);
+				}
+				finally { _gate.Release(); }
 			}
 		}
 

@@ -2,6 +2,7 @@
 // that checks for a new EldoUI, the app's own quiet self-update, and the window. The same behaviour as
 // the Windows TrayApp: checks every 3 hours, installs by itself, never a pop-up for the app's own update.
 using System;
+using System.Linq;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
@@ -60,6 +61,19 @@ namespace EldoUI.Updater
 			_form.OpenAddOnsClicked += OpenAddOns;
 			_form.AutostartChanged += SetAutostart;
 			_form.AutoInstallChanged += SetAutoInstall;
+
+			_form.CompanionChanged += (id, on) => {
+				if (_engine.Busy) return;
+				_settings.SelectCompanion(id, on);
+				Save(); UpdateView(null);
+			};
+			_form.InstallExtrasClicked += all => {
+				if (_engine.Busy) return;
+				if (all) { _settings.SelectedCompanions = Companion.All.Select(a => a.Id).ToList(); _settings.ExtraAddons = true; }
+				Save(); Check(true, false, true);
+			};
+			_form.DetailsClicked += () => Setup.OpenPage(Release.DetailsPage);
+
 			_form.AppUpdateClicked += () => InstallApp();
 
 			_miStatus = new NativeMenuItem { IsEnabled = false };
@@ -202,14 +216,16 @@ namespace EldoUI.Updater
 			}
 			if (better == null || better == cur) return;
 			// A different game folder: what the last install put elsewhere is not ours to remove here.
-			if (valid) _settings.InstalledFolders.Clear();
+			_settings.InstalledFolders.Clear();
+			_settings.ExtraVersions.Clear();
+			_settings.ExtraFiles.Clear();
 			_settings.AddOnsDir = better;
 			Log.Write((valid ? "Moved to WoW: Forever AddOns at " : "Found WoW: Forever AddOns at ") + better);
 			Save();
 		}
 
 		/// <summary>Checks for a new EldoUI. user: the player asked. install: install even if automatic install is off.</summary>
-		async void Check(bool user, bool install)
+		async void Check(bool user, bool install, bool installExtras = false)
 		{
 			if (_engine.Busy)
 			{
@@ -233,7 +249,7 @@ namespace EldoUI.Updater
 			CheckResult r;
 			try
 			{
-				r = await _engine.CheckAsync(_settings, install, _quit.Token);
+				r = await _engine.CheckAsync(_settings, install, _quit.Token, installExtras);
 			}
 			catch (OperationCanceledException)
 			{
@@ -320,6 +336,8 @@ namespace EldoUI.Updater
 				LastCheck = _settings.LastCheck,
 				Autostart = Setup.Autostart,
 				AutoInstall = _settings.AutoInstall,
+				ExtraAddons = _settings.ExtraAddons,
+				SelectedCompanions = _settings.SelectedCompanions.ToArray(),
 				AppNew = _app != null ? _app.Version : null,
 				AppAt = _app != null ? (DateTime?)_appAt : null,
 				AppBusy = _appBusy,
@@ -358,6 +376,16 @@ namespace EldoUI.Updater
 						v.Kind = StatusKind.Error;
 						v.Status = r.Error != null && r.Error.Contains("wait") ? T.S("state.ratelimited") : T.S("state.failed");
 						break;
+				}
+			}
+			if (r != null && r.Companions != null && _settings.ExtraAddons)
+			{
+				v.ExtraStatus = string.Join("\n", r.Companions.Select(c => c.Name + ": " + T.S("extra." + c.Outcome) + (c.Error != null ? " (" + c.Error + ")" : "")));
+				if (r.Companions.Any(c => c.Outcome == CompanionOutcome.Available)) v.Action = MainAction.Update;
+				if (r.Companions.Any(c => c.Outcome == CompanionOutcome.Failed))
+				{
+					v.Kind = StatusKind.Warn;
+					v.Status = T.S("extras.partial");
 				}
 			}
 			_view = v;
@@ -471,13 +499,14 @@ namespace EldoUI.Updater
 
 		async Task ChooseFolder()
 		{
+			if (_engine.Busy) { ShowWindow(); return; }
 			ShowWindow();
 			var picked = await _form.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
 			{
 				Title = T.S("folder.prompt"),
 				AllowMultiple = false,
 			});
-			if (picked == null || picked.Count == 0) return;
+			if (_engine.Busy || picked == null || picked.Count == 0) return;
 			string path = picked[0].TryGetLocalPath();
 			string addOns = path != null ? WowSearch.Resolve(path) : null;
 			if (addOns == null)
@@ -487,7 +516,12 @@ namespace EldoUI.Updater
 				_form.Render(_view);
 				return;
 			}
-			if (addOns != _settings.AddOnsDir) _settings.InstalledFolders.Clear();
+			if (addOns != _settings.AddOnsDir)
+			{
+				_settings.InstalledFolders.Clear();
+				_settings.ExtraVersions.Clear();
+				_settings.ExtraFiles.Clear();
+			}
 			_settings.AddOnsDir = addOns;
 			Save();
 			Log.Write("AddOns folder chosen: " + addOns);

@@ -17,7 +17,7 @@ EldoUI settings stay as they are.
 
 1. Run `EldoUI-Updater.exe`. It installs itself for your Windows user and opens its window.
 2. It finds WoW: Forever by itself (the `_forever_` folder, or `_classic_beta_` during the beta). If it
-   cannot, click **Choose folder…** and pick your `World of Warcraft` folder.
+   cannot, click **Choose folder…** and pick your `_forever_` game folder. Interface/AddOns is created when needed.
 3. That is all. It installs EldoUI if it is missing, and every new version after that. Type `/reload` in
    the game if it is open.
 
@@ -56,8 +56,7 @@ off), start with Windows or at login (on or off), language (English or Danish), 
   not match, nothing is installed and the window says so.
 - The zip may only hold EldoUI folders (`EldoUI`, `EldoUI_<Name>`), each with its own `.toc`. They are
   unpacked next to AddOns first and then swapped in; if anything fails, the old folders are put back.
-- It manages only EldoUI's own folders: the ones in the zip and the ones it installed before. Other addons,
-  any other folder in AddOns and the game's `WTF` folder (your settings) are never touched.
+- It manages only EldoUI's own folders: the ones in the zip and the ones it installed before. Companion addons are managed only after you enable the optional setting below. Other addons and the game's `WTF` folder (your settings) are never touched.
 - The updater updates itself from this repository's releases, with the same checksum rule.
 
 ## Privacy and safety
@@ -65,10 +64,10 @@ off), start with Windows or at login (on or off), language (English or Danish), 
 - **Sends:** only `GET` requests to GitHub's public API (`api.github.com`) and release downloads from
   `github.com`. No account, no token, no telemetry, nothing about you or your PC.
 - **Reads:** where your games are (Battle.net's settings and installed-games list, the registry on
-  Windows, Wine prefixes on Linux), and the `.toc` of the installed EldoUI to know its version.
-- **Opens:** only pages on `github.com` (release notes, EldoUI on GitHub). Any other link is refused.
+  Windows, Wine prefixes on Linux), the `.toc` of the installed EldoUI to know its version, and explicitly enabled companion folders to preserve their existing files during updates.
+- **Opens:** pages on `github.com` and the exact Details! CurseForge project page for manual installation. Other external pages are refused.
 - **First start:** a short notice says what the updater does and how to turn its automatic parts off.
-- **Writes:** EldoUI's folders in AddOns, and its own files (on Linux, the installed AppImage is runnable
+- **Writes:** EldoUI's folders and explicitly enabled companion folders in AddOns, and its own files (on Linux, the installed AppImage is runnable
   only by your user):
 
 | What | Windows | Linux |
@@ -113,3 +112,26 @@ Apache License 2.0 (see `LICENSE` and `NOTICE`). Made by Eldodeldo, as an AI-mad
 
 EldoUI is not made by or affiliated with Blizzard Entertainment. World of Warcraft is a trademark of
 Blizzard Entertainment, Inc.
+
+## Optional companion addons (1.2.4)
+
+Open **Extra addons…** in the updater window and check **DBM**, **RestedXP** or
+**WeakAuras SharedMedia** individually. Use **Install selected addons**, or **Install all EldoUI recommended**
+to select and install all three at once. They are not managed until you choose them. Automatic installation follows
+**Install updates automatically**; when that is off, **Update now** applies available updates.
+Point at the companion option for each addon's result and failure details. Removing a checkmark stops managing that addon and leaves it installed.
+
+Packages come directly from the publishers' GitHub releases. Both the compatibility manifest and
+package need published SHA-256 checksums, and the manifest must explicitly list the Forever flavor.
+Each package has a separate folder boundary, version and managed-file inventory. Updates preserve
+files outside the publisher's package inventory, including user-added guide files; only files previously
+managed by this updater are removed when the next package drops them. Failed placement restores the
+old folders; a failed restoration retains its backup instead of deleting it. Symlinked addon trees
+are refused. No game WTF data is changed and no third-party files are bundled or republished.
+
+The menu also links to the Details! CurseForge project page. Details! is intentionally not managed: install and update it separately with the CurseForge app.
+There is no CurseForge API integration, account requirement or API key.
+
+Upstream sources: [DBM](https://github.com/DeadlyBossMods/DeadlyBossMods/releases),
+[RestedXP](https://github.com/RestedXP/RXPGuides/releases),
+[SharedMedia](https://github.com/WeakAuras/WeakAuras_SharedMedia/releases).

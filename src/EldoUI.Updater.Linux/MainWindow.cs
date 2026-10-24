@@ -27,6 +27,9 @@ namespace EldoUI.Updater
 		public bool Busy;
 		public bool Autostart;
 		public bool AutoInstall;
+		public bool ExtraAddons;
+		public string[] SelectedCompanions = new string[0];
+		public string ExtraStatus;
 		public string AppNew;
 		public DateTime? AppAt;
 		public bool AppBusy;
@@ -59,14 +62,18 @@ namespace EldoUI.Updater
 	{
 		public event Action CheckClicked, UpdateClicked, ChooseFolderClicked, OpenAddOnsClicked, AppUpdateClicked;
 		public event Action<bool> AutostartChanged, AutoInstallChanged;
+		public event Action<string, bool> CompanionChanged;
+		public event Action<bool> InstallExtrasClicked;
+		public event Action DetailsClicked;
 		public bool AllowClose;
 
-		readonly Canvas _canvas = new Canvas { Width = 470, Height = 450 };
+		readonly Canvas _canvas = new Canvas { Width = 470, Height = 482 };
 		readonly TextBlock _title, _tagline, _status, _footer, _appUpdate;
 		readonly TextBlock[] _labels = new TextBlock[5];
 		readonly TextBlock _installed, _latest, _folder, _checked, _app;
 		readonly Ellipse _dot, _halo;
 		readonly CheckBox _autostart, _autoInstall;
+		readonly Button _extras;
 		readonly Button _primary, _chooseFolder, _openAddOns;
 		ViewState _state = new ViewState();
 		bool _rendering;
@@ -75,7 +82,7 @@ namespace EldoUI.Updater
 		{
 			Title = "EldoUI Updater";
 			Width = 470;
-			Height = 450;
+			Height = 482;
 			CanResize = false;
 			WindowStartupLocation = WindowStartupLocation.CenterScreen;
 			Background = Palette.B(Palette.Panel);
@@ -151,6 +158,10 @@ namespace EldoUI.Updater
 			_autoInstall.IsCheckedChanged += (s, e) => { if (!_rendering && AutoInstallChanged != null) AutoInstallChanged(_autoInstall.IsChecked == true); };
 			Place(_autostart, 18, 302);
 			Place(_autoInstall, 18, 330);
+			_extras = MakeButton(428, false);
+			_extras.Height = 28;
+			_extras.Click += (sender, args) => ShowCompanions();
+			Place(_extras, 18, 358);
 
 			// Actions: one gold main button, two quiet ones.
 			_primary = MakeButton(156, true);
@@ -159,12 +170,12 @@ namespace EldoUI.Updater
 			_primary.Click += (s, e) => OnPrimary();
 			_chooseFolder.Click += (s, e) => ChooseFolderClicked?.Invoke();
 			_openAddOns.Click += (s, e) => OpenAddOnsClicked?.Invoke();
-			Place(_primary, 22, 372);
-			Place(_chooseFolder, 188, 372);
-			Place(_openAddOns, 334, 372);
+			Place(_primary, 22, 404);
+			Place(_chooseFolder, 188, 404);
+			Place(_openAddOns, 334, 404);
 
 			_footer = new TextBlock { Width = 390, FontSize = 11, TextAlignment = TextAlignment.Center, Foreground = Palette.B(Palette.Muted) };
-			Place(_footer, 40, 422);
+			Place(_footer, 40, 454);
 			Ornaments();
 
 			Content = _canvas;
@@ -188,8 +199,8 @@ namespace EldoUI.Updater
 		void Ornaments()
 		{
 			var pen = Palette.B(Color.FromArgb(200, Palette.Ornament.R, Palette.Ornament.G, Palette.Ornament.B));
-			Place(new Path { Data = Geometry.Parse("M 0,0 L 0,13 A 5,5 0 0 0 5,18 L 18,18"), Stroke = pen, StrokeThickness = 1 }, 8, 424);
-			Place(new Path { Data = Geometry.Parse("M 18,0 L 18,13 A 5,5 0 0 1 13,18 L 0,18"), Stroke = pen, StrokeThickness = 1 }, 444, 424);
+			Place(new Path { Data = Geometry.Parse("M 0,0 L 0,13 A 5,5 0 0 0 5,18 L 18,18"), Stroke = pen, StrokeThickness = 1 }, 8, 456);
+			Place(new Path { Data = Geometry.Parse("M 18,0 L 18,13 A 5,5 0 0 1 13,18 L 0,18"), Stroke = pen, StrokeThickness = 1 }, 444, 456);
 		}
 
 		static CheckBox Check()
@@ -265,6 +276,31 @@ namespace EldoUI.Updater
 			}
 		}
 
+		void ShowCompanions()
+		{
+			var items = new System.Collections.Generic.List<object>();
+			foreach (var addon in Core.Companion.All)
+			{
+				var chosen = _state.ExtraAddons && Array.IndexOf(_state.SelectedCompanions, addon.Id) >= 0;
+				var item = new MenuItem { Header = addon.Name, ToggleType = MenuItemToggleType.CheckBox, IsChecked = chosen };
+				item.Click += (sender, args) => CompanionChanged?.Invoke(addon.Id, !chosen);
+				items.Add(item);
+			}
+			items.Add(new Separator());
+			var selected = new MenuItem { Header = T.S("extras.install_selected"), IsEnabled = _state.ExtraAddons };
+			selected.Click += (sender, args) => InstallExtrasClicked?.Invoke(false);
+			items.Add(selected);
+			var all = new MenuItem { Header = T.S("extras.install_all") };
+			all.Click += (sender, args) => InstallExtrasClicked?.Invoke(true);
+			items.Add(all);
+			items.Add(new Separator());
+			var details = new MenuItem { Header = T.S("extras.details") };
+			details.Click += (sender, args) => DetailsClicked?.Invoke();
+			items.Add(details);
+			var menu = new ContextMenu { ItemsSource = items };
+			menu.Open(_extras);
+		}
+
 		public void ApplyTexts()
 		{
 			Title = T.S("app");
@@ -273,6 +309,7 @@ namespace EldoUI.Updater
 			foreach (var l in _labels) l.Text = T.S((string)l.Tag);
 			_autostart.Content = T.S("check.autostart");
 			_autoInstall.Content = T.S("check.auto");
+			_extras.Content = T.S("check.extras");
 			_chooseFolder.Content = T.S("btn.folder");
 			_openAddOns.Content = T.S("btn.addons");
 			_appUpdate.Text = T.S("btn.update");
@@ -300,11 +337,14 @@ namespace EldoUI.Updater
 				_appUpdate.IsVisible = s.AppNew != null && !s.AppBusy;
 				_autostart.IsChecked = s.Autostart;
 				_autoInstall.IsChecked = s.AutoInstall;
+				_extras.IsEnabled = !s.Busy;
+				ToolTip.SetTip(_extras, s.ExtraStatus ?? T.S("extras.hint"));
 				_primary.Content = T.S(s.Action == MainAction.ChooseFolder ? "btn.folder"
 					: s.Action == MainAction.Update ? "btn.update"
 					: s.Action == MainAction.Install ? "btn.install" : "btn.check");
 				_primary.IsEnabled = !s.Busy;
 				_chooseFolder.IsVisible = s.Action != MainAction.ChooseFolder;
+				_chooseFolder.IsEnabled = !s.Busy;
 				_openAddOns.IsEnabled = !string.IsNullOrEmpty(s.Folder);
 				Color dot = s.Kind == StatusKind.Ok ? Palette.Ok : s.Kind == StatusKind.Warn ? Palette.Warn
 					: s.Kind == StatusKind.Error ? Palette.Err : Palette.Accent;

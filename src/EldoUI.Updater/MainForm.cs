@@ -22,6 +22,9 @@ namespace EldoUI.Updater
 		public bool Busy;
 		public bool Autostart;
 		public bool AutoInstall;
+		public bool ExtraAddons;
+		public string[] SelectedCompanions = new string[0];
+		public string ExtraStatus;
 		/// <summary>A newer version of the updater itself, when it installs by itself, and whether it is installing now.</summary>
 		public string AppNew;
 		public DateTime? AppAt;
@@ -32,12 +35,16 @@ namespace EldoUI.Updater
 	{
 		public event Action CheckClicked, UpdateClicked, ChooseFolderClicked, OpenAddOnsClicked, AppUpdateClicked;
 		public event Action<bool> AutostartChanged, AutoInstallChanged;
+		public event Action<string, bool> CompanionChanged;
+		public event Action<bool> InstallExtrasClicked;
+		public event Action DetailsClicked;
 		public bool AllowClose;
 
 		readonly Image _logo;
 		readonly Label _status, _installed, _latest, _folder, _checked, _app, _appUpdate, _footer;
 		readonly Label[] _labels = new Label[5];
 		readonly ECheck _autostart, _autoInstall;
+		readonly EButton _extras;
 		readonly EButton _primary, _chooseFolder, _openAddOns;
 		readonly Font _head, _tag, _body, _small, _link;
 		readonly ToolTip _tips = new ToolTip();
@@ -61,7 +68,7 @@ namespace EldoUI.Updater
 			FormBorderStyle = FormBorderStyle.FixedSingle;
 			MaximizeBox = false;
 			StartPosition = FormStartPosition.CenterScreen;
-			ClientSize = new Size(470, 450);
+			ClientSize = new Size(470, 482);
 			BackColor = Theme.Panel;
 			ForeColor = Theme.Text;
 			Font = _body;
@@ -98,10 +105,13 @@ namespace EldoUI.Updater
 			_autoInstall.CheckedChanged += (s, e) => { if (!_rendering && AutoInstallChanged != null) AutoInstallChanged(_autoInstall.Checked); };
 			Controls.Add(_autostart);
 			Controls.Add(_autoInstall);
+			_extras = new EButton { Location = new Point(22, 360), Size = new Size(428, 28) };
+			_extras.Click += (sender, args) => ShowCompanions();
+			Controls.Add(_extras);
 
-			_primary = new EButton { Primary = true, Location = new Point(22, 372), Size = new Size(156, 36) };
-			_chooseFolder = new EButton { Location = new Point(188, 372), Size = new Size(136, 36) };
-			_openAddOns = new EButton { Location = new Point(334, 372), Size = new Size(116, 36) };
+			_primary = new EButton { Primary = true, Location = new Point(22, 404), Size = new Size(156, 36) };
+			_chooseFolder = new EButton { Location = new Point(188, 404), Size = new Size(136, 36) };
+			_openAddOns = new EButton { Location = new Point(334, 404), Size = new Size(116, 36) };
 			_primary.Click += (s, e) => OnPrimary();
 			_chooseFolder.Click += (s, e) => { if (ChooseFolderClicked != null) ChooseFolderClicked(); };
 			_openAddOns.Click += (s, e) => { if (OpenAddOnsClicked != null) OpenAddOnsClicked(); };
@@ -109,7 +119,7 @@ namespace EldoUI.Updater
 			Controls.Add(_chooseFolder);
 			Controls.Add(_openAddOns);
 
-			_footer = new Label { Location = new Point(40, 420), Size = new Size(390, 20), ForeColor = Theme.Muted, Font = _small, TextAlign = ContentAlignment.MiddleCenter };
+			_footer = new Label { Location = new Point(40, 452), Size = new Size(390, 20), ForeColor = Theme.Muted, Font = _small, TextAlign = ContentAlignment.MiddleCenter };
 			Controls.Add(_footer);
 
 			AcceptButton = _primary;
@@ -164,12 +174,33 @@ namespace EldoUI.Updater
 			}
 		}
 
+		void ShowCompanions()
+		{
+			var menu = new ContextMenuStrip { Renderer = new MenuRenderer(), ShowCheckMargin = true };
+			foreach (var addon in Core.Companion.All)
+			{
+				var item = new ToolStripMenuItem(addon.Name) { Checked = _state.ExtraAddons && Array.IndexOf(_state.SelectedCompanions, addon.Id) >= 0 };
+				item.Click += (sender, args) => CompanionChanged?.Invoke(addon.Id, !item.Checked);
+				menu.Items.Add(item);
+			}
+			menu.Items.Add(new ToolStripSeparator());
+			var selected = new ToolStripMenuItem(T.S("extras.install_selected")) { Enabled = _state.ExtraAddons };
+			selected.Click += (sender, args) => InstallExtrasClicked?.Invoke(false);
+			menu.Items.Add(selected);
+			menu.Items.Add(T.S("extras.install_all"), null, (sender, args) => InstallExtrasClicked?.Invoke(true));
+			menu.Items.Add(new ToolStripSeparator());
+			menu.Items.Add(T.S("extras.details"), null, (sender, args) => DetailsClicked?.Invoke());
+			menu.Closed += (sender, args) => menu.Dispose();
+			menu.Show(_extras, new Point(0, _extras.Height));
+		}
+
 		public void ApplyTexts()
 		{
 			Text = T.S("app");
 			foreach (var l in _labels) l.Text = T.S((string)l.Tag);
 			_autostart.Text = T.S("check.autostart");
 			_autoInstall.Text = T.S("check.auto");
+			_extras.Text = T.S("check.extras");
 			_chooseFolder.Text = T.S("btn.folder");
 			_openAddOns.Text = T.S("btn.addons");
 			_appUpdate.Text = T.S("btn.update");
@@ -197,11 +228,14 @@ namespace EldoUI.Updater
 				_appUpdate.Visible = s.AppNew != null && !s.AppBusy;
 				_autostart.Checked = s.Autostart;
 				_autoInstall.Checked = s.AutoInstall;
+				_extras.Enabled = !s.Busy;
+				_tips.SetToolTip(_extras, s.ExtraStatus ?? T.S("extras.hint"));
 				_primary.Text = T.S(s.Action == MainAction.ChooseFolder ? "btn.folder"
 					: s.Action == MainAction.Update ? "btn.update"
 					: s.Action == MainAction.Install ? "btn.install" : "btn.check");
 				_primary.Enabled = !s.Busy;
 				_chooseFolder.Visible = s.Action != MainAction.ChooseFolder;
+				_chooseFolder.Enabled = !s.Busy;
 				_openAddOns.Enabled = !string.IsNullOrEmpty(s.Folder);
 				Invalidate(new Rectangle(0, (int)(100 * K), (int)(40 * K), (int)(50 * K)));
 			}

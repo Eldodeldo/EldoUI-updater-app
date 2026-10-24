@@ -156,7 +156,7 @@ namespace EldoUI.Updater
 		/// <summary>Opens a page on github.com in the browser; the app never opens any other address.</summary>
 		public static void OpenPage(string url)
 		{
-			if (!Release.IsGitHubPage(url)) { Log.Write("Refused to open a link that is not on github.com"); return; }
+			if (!Release.IsAllowedPage(url)) { Log.Write("Refused to open an unapproved page"); return; }
 			Open(url);
 		}
 

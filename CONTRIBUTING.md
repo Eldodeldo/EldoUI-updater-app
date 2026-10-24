@@ -10,6 +10,6 @@ Thanks for helping with the EldoUI Updater.
 - **Changelog:** add a line in plain player language under the new version in `CHANGELOG.md`.
 
 The updater only talks to GitHub, installs only files with a matching published checksum, and touches only
-EldoUI's own folders. Changes must keep all three.
+EldoUI's own folders and the explicitly enabled companion packages' scoped folders. Changes must keep all three.
 
 By contributing, you agree that your contribution is licensed under the Apache License 2.0.

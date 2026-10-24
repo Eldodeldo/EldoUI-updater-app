@@ -40,6 +40,16 @@ namespace EldoUI.Updater
 
 		static readonly Dictionary<string, string> En = new Dictionary<string, string>
 		{
+			{ "extras.install_selected", "Install selected addons" },
+			{ "extras.install_all", "Install all EldoUI recommended" },
+			{ "extras.details", "Details! — open CurseForge (manual install)" },
+			{ "check.extras", "Extra addons…" },
+			{ "extras.hint", "Keep DBM, RestedXP and SharedMedia updated. Only when selected; follows automatic installs. Point here for individual results." },
+			{ "extras.partial", "Some extra addons need attention. Point at the extra addons option for details." },
+			{ "extra.Current", "Up to date" },
+			{ "extra.Available", "Update available" },
+			{ "extra.Installed", "Installed" },
+			{ "extra.Failed", "Update failed; try again" },
 			{ "app", "EldoUI Updater" },
 			{ "tagline", "Keeps EldoUI up to date for WoW: Forever" },
 			{ "menu.open", "Open EldoUI Updater" },
@@ -121,6 +131,16 @@ namespace EldoUI.Updater
 
 		static readonly Dictionary<string, string> Da = new Dictionary<string, string>
 		{
+			{ "extras.install_selected", "Installér valgte addons" },
+			{ "extras.install_all", "Installér alle EldoUI-anbefalinger" },
+			{ "extras.details", "Details! — åbn CurseForge (manuel installation)" },
+			{ "check.extras", "Ekstra addons…" },
+			{ "extras.hint", "Hold DBM, RestedXP og SharedMedia opdateret. Kun ved tilvalg; følger automatiske installationer. Peg her for individuelle resultater." },
+			{ "extras.partial", "Nogle ekstra addons kræver handling. Peg på tilvalget for detaljer." },
+			{ "extra.Current", "Opdateret" },
+			{ "extra.Available", "Opdatering klar" },
+			{ "extra.Installed", "Installeret" },
+			{ "extra.Failed", "Opdateringen fejlede; prøv igen" },
 			{ "app", "EldoUI Updater" },
 			{ "tagline", "Holder EldoUI opdateret til WoW: Forever" },
 			{ "menu.open", "Åbn EldoUI Updater" },
