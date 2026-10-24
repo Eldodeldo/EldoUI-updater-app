@@ -4,6 +4,9 @@ using System;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
+using System.Drawing;
+using System.Reflection;
+using System.Windows.Forms;
 using EldoUI.Updater.Core;
 
 namespace EldoUI.Updater
@@ -40,6 +43,33 @@ namespace EldoUI.Updater
 				check(!Directory.Exists(Path.Combine(addOns, "EldoUI_Old")) && r2.Removed.Contains("EldoUI_Old"), "a folder the release dropped is removed");
 				check(Directory.Exists(Path.Combine(addOns, "SomeOtherAddon")), "other addons are untouched");
 				check(Directory.GetDirectories(Path.GetDirectoryName(addOns), ".eldoui-updater-*").Length == 0, "no work folder is left behind");
+
+				using (var form = new MainForm(Assets.Icon(false), Assets.Logo()) {
+					StartPosition = FormStartPosition.Manual, Location = new Point(-3000, -3000), ShowInTaskbar = false })
+				{
+					form.Render(new ViewState { ExtraAddons = true, SelectedCompanions = new[] { "dbm" } });
+					bool installAll = false, installSelected = false, details = false, uncheckedDbm = false;
+					form.InstallExtrasClicked += all => { if (all) installAll = true; else installSelected = true; };
+					form.DetailsClicked += () => details = true;
+					form.CompanionChanged += (id, selected) => uncheckedDbm = id == "dbm" && !selected;
+					form.Show();
+					var show = typeof(MainForm).GetMethod("ShowCompanions", BindingFlags.Instance | BindingFlags.NonPublic);
+					show.Invoke(form, null);
+					var menu = (ContextMenuStrip) typeof(MainForm).GetField("_companionMenu", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(form);
+					var allItem = menu.Items[5];
+					menu.Close();
+					check(!menu.IsDisposed, "closing the companion menu keeps the click target alive");
+					allItem.PerformClick();
+					check(installAll, "Install all still runs after the menu closes");
+					show.Invoke(form, null);
+					menu.Close();
+					menu.Items[4].PerformClick();
+					menu.Items[0].PerformClick();
+					menu.Items[7].PerformClick();
+					check(installSelected && uncheckedDbm && details, "reopening preserves selected-install, checkmark and Details actions");
+					form.AllowClose = true;
+					form.Close();
+				}
 
 				string bad = Path.Combine(root, "bad.zip");
 				using (var z = ZipFile.Open(bad, ZipArchiveMode.Create))

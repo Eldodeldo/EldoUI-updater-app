@@ -2,6 +2,11 @@
 
 Each release of the EldoUI Updater. The newest is at the top.
 
+## [1.2.5] - 2026-10-24
+
+### Fixed
+- Installing recommended addons from the Extra addons menu no longer closes the menu with an application error.
+
 ## [1.2.4] - 2026-10-24
 
 ### New

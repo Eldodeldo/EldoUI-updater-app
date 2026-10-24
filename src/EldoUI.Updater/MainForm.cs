@@ -1,5 +1,6 @@
 // The updater's one window: what is installed, what is newest, where WoW is, and the main actions.
 using System;
+using System.Linq;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -48,6 +49,7 @@ namespace EldoUI.Updater
 		readonly EButton _primary, _chooseFolder, _openAddOns;
 		readonly Font _head, _tag, _body, _small, _link;
 		readonly ToolTip _tips = new ToolTip();
+		readonly ContextMenuStrip _companionMenu = new ContextMenuStrip { Renderer = new MenuRenderer(), ShowCheckMargin = true };
 		ViewState _state = new ViewState();
 		bool _rendering;
 
@@ -176,7 +178,9 @@ namespace EldoUI.Updater
 
 		void ShowCompanions()
 		{
-			var menu = new ContextMenuStrip { Renderer = new MenuRenderer(), ShowCheckMargin = true };
+			var menu = _companionMenu;
+			foreach (ToolStripItem old in new System.Collections.Generic.List<ToolStripItem>(menu.Items.Cast<ToolStripItem>())) old.Dispose();
+			menu.Items.Clear();
 			foreach (var addon in Core.Companion.All)
 			{
 				var item = new ToolStripMenuItem(addon.Name) { Checked = _state.ExtraAddons && Array.IndexOf(_state.SelectedCompanions, addon.Id) >= 0 };
@@ -190,7 +194,6 @@ namespace EldoUI.Updater
 			menu.Items.Add(T.S("extras.install_all"), null, (sender, args) => InstallExtrasClicked?.Invoke(true));
 			menu.Items.Add(new ToolStripSeparator());
 			menu.Items.Add(T.S("extras.details"), null, (sender, args) => DetailsClicked?.Invoke());
-			menu.Closed += (sender, args) => menu.Dispose();
 			menu.Show(_extras, new Point(0, _extras.Height));
 		}
 
@@ -321,6 +324,7 @@ namespace EldoUI.Updater
 			if (disposing)
 			{
 				_tips.Dispose();
+				_companionMenu.Dispose();
 				_head.Dispose();
 				_tag.Dispose();
 				_small.Dispose();
