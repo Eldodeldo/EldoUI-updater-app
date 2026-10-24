@@ -2,6 +2,11 @@
 
 Each release of the EldoUI Updater. The newest is at the top.
 
+## [1.2.6] - 2026-10-24
+
+### New
+- Check for an updater update directly beside This app in the open window. The button shows checking progress and switches to Update now when an update is available.
+
 ## [1.2.5] - 2026-10-24
 
 ### Fixed
