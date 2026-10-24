@@ -384,6 +384,23 @@ namespace EldoUI.Updater.Tests
 
 	public class WowFolderTests
 	{
+		[Theory]
+		[InlineData("_retail_")]
+		[InlineData("_classic_era_")]
+		[InlineData("_unrelated_")]
+		public void ExplicitSelectionRejectsOtherGameFolders(string flavor)
+		{
+			using (var t = new TempDir())
+			{
+				string root = t.Sub(flavor);
+				string addOns = Path.Combine(root, "Interface", "AddOns");
+				Directory.CreateDirectory(addOns);
+				Assert.Null(WowFolders.ResolveAddOns(root));
+				Assert.Null(WowFolders.ResolveAddOns(Path.GetDirectoryName(addOns)));
+				Assert.Null(WowFolders.ResolveAddOns(addOns));
+			}
+		}
+
 		[Fact]
 		public void ResolvesEveryLevelToAddOns()
 		{
@@ -693,6 +710,26 @@ namespace EldoUI.Updater.Tests
 
 	public class EngineTests
 	{
+		[Fact]
+		public async Task LockedInstalledVersionReturnsFailureAndCanRetry()
+		{
+			using (var t = new TempDir())
+			{
+				var (web, _) = Serve(t, "0.7.0002");
+				var settings = WithOldInstall(t);
+				var engine = new UpdateEngine(web, t.Sub("tmp"), null);
+				string toc = Path.Combine(settings.AddOnsDir, "EldoUI", "EldoUI.toc");
+				using (var locked = new FileStream(toc, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+				{
+					var result = await engine.CheckAsync(settings, false, CancellationToken.None);
+					Assert.Equal(CheckOutcome.Failed, result.Outcome);
+					Assert.NotNull(result.Error);
+					Assert.False(engine.Busy);
+				}
+				Assert.Equal(CheckOutcome.Installed, (await engine.CheckAsync(settings, false, CancellationToken.None)).Outcome);
+			}
+		}
+
 		[Fact]
 		public async Task InstallsIntoFreshForeverRootWithoutInterfaceFolder()
 		{

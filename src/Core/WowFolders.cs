@@ -33,6 +33,12 @@ namespace EldoUI.Updater.Core
 			return name.Length > 2 && name.StartsWith("_") && name.EndsWith("_") && Directory.Exists(dir);
 		}
 
+		static bool IsForeverFolder(string dir)
+		{
+			return !string.IsNullOrEmpty(dir) && Directory.Exists(dir)
+				&& ForeverFlavors.Any(f => string.Equals(Path.GetFileName(dir.TrimEnd('\\', '/')), f, StringComparison.OrdinalIgnoreCase));
+		}
+
 		/// <summary>Turns whatever folder the player picked into an AddOns folder, or null when it is not part of a WoW install.</summary>
 		public static string ResolveAddOns(string picked)
 		{
@@ -45,10 +51,10 @@ namespace EldoUI.Updater.Core
 
 			if (name.Equals("AddOns", StringComparison.OrdinalIgnoreCase)
 				&& Path.GetFileName(Path.GetDirectoryName(dir) ?? "").Equals("Interface", StringComparison.OrdinalIgnoreCase))
-				return dir;
+				return IsForeverFolder(Path.GetDirectoryName(Path.GetDirectoryName(dir))) ? dir : null;
 			if (name.Equals("Interface", StringComparison.OrdinalIgnoreCase))
-				return Path.Combine(dir, "AddOns");
-			if (IsFlavorFolder(dir))
+				return IsForeverFolder(Path.GetDirectoryName(dir)) ? Path.Combine(dir, "AddOns") : null;
+			if (IsForeverFolder(dir))
 				return Path.Combine(dir, "Interface", "AddOns");
 			// The install folder: pick the Forever flavor in it.
 			string flavor = ForeverFlavorIn(dir);

@@ -216,7 +216,11 @@ namespace EldoUI.Updater
 		/// <summary>Checks for a new EldoUI. user: the player asked (show the result in the window). install: install even if automatic install is off.</summary>
 		async void Check(bool user, bool install)
 		{
-			if (_engine.Busy) return;
+			if (_engine.Busy)
+			{
+				if (user) ShowWindow();
+				return;
+			}
 			FindFolder();
 			if (string.IsNullOrEmpty(_settings.AddOnsDir))
 			{
@@ -231,6 +235,7 @@ namespace EldoUI.Updater
 			_view.Kind = StatusKind.Busy;
 			_view.Status = T.S("state.checking");
 			_form.Render(_view);
+			if (user && !_showPending) ShowWindow();
 			CheckResult r;
 			try
 			{
@@ -306,9 +311,16 @@ namespace EldoUI.Updater
 
 		void UpdateView(CheckResult r)
 		{
+			string installed = r != null ? r.Installed : null;
+			if (r == null)
+			{
+				try { installed = AddonInstaller.InstalledVersion(_settings.AddOnsDir); }
+				catch (IOException ex) { Log.Write("Could not read installed version: " + ex.Message); }
+				catch (UnauthorizedAccessException ex) { Log.Write("Could not read installed version: " + ex.Message); }
+			}
 			var v = new ViewState
 			{
-				Installed = AddonInstaller.InstalledVersion(_settings.AddOnsDir),
+				Installed = installed,
 				Latest = r != null ? r.Latest : _view.Latest,
 				Folder = _settings.AddOnsDir,
 				LastCheck = _settings.LastCheck,
