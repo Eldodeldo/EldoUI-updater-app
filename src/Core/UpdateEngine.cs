@@ -87,7 +87,7 @@ namespace EldoUI.Updater.Core
 					string body = await _web.GetApiAsync(_apiBase + "/repos/" + AddonRepo + "/releases?per_page=10", ct).ConfigureAwait(false);
 					var releases = Release.ListFromGitHub(body);
 					settings.LastCheck = DateTime.UtcNow;
-					r.Release = releases.FirstOrDefault(x => x.Find(AddonAssetPattern) != null);
+					r.Release = releases.FirstOrDefault(x => AddonAsset(x) != null);
 					if (r.Release == null)
 					{
 						r.Outcome = CheckOutcome.NoDownload;
@@ -162,16 +162,29 @@ namespace EldoUI.Updater.Core
 			}
 		}
 
+		// Match the selected release, not merely any EldoUI zip attached to it.
+		static ReleaseAsset AddonAsset(Release release)
+		{
+			if (release == null || release.Version == null || release.Tag == null
+				|| !System.Text.RegularExpressions.Regex.IsMatch(release.Version, @"\A[0-9]+(?:\.[0-9]+)+\z")) return null;
+			string root = "https://github.com/" + AddonRepo + "/releases/download/" + Uri.EscapeDataString(release.Tag) + "/";
+			return release.Assets.FirstOrDefault(a =>
+				(string.Equals(a.Name, "EldoUI-" + release.Version + ".zip", StringComparison.OrdinalIgnoreCase)
+					|| string.Equals(a.Name, "EldoUI-v" + release.Version + ".zip", StringComparison.OrdinalIgnoreCase))
+				&& string.Equals(a.Url, root + Uri.EscapeDataString(a.Name), StringComparison.Ordinal));
+		}
+
 		async Task<InstallResult> InstallAsync(Release release, Settings settings, CancellationToken ct)
 		{
-			var asset = release.Find(AddonAssetPattern);
+			var asset = AddonAsset(release);
+			if (asset == null) throw new InvalidDataException("The release has no matching EldoUI download.");
 			Directory.CreateDirectory(_tempDir);
 			string zip = Path.Combine(_tempDir, "EldoUI-" + release.Version + ".zip");
 			try
 			{
 				_log("Downloading " + asset.Name);
 				string sha = await DownloadCheckedAsync(release, asset, zip, MaxAddonZip, ct).ConfigureAwait(false);
-				var result = AddonInstaller.Install(zip, settings.AddOnsDir, settings.InstalledFolders);
+				var result = AddonInstaller.Install(zip, settings.AddOnsDir, settings.InstalledFolders, release.Version);
 				settings.InstalledFolders = result.Folders.ToList();
 				_log("Installed EldoUI " + (result.Version ?? release.Version) + " (" + string.Join(", ", result.Folders) + "), sha256 " + sha
 					+ (result.Removed.Count > 0 ? "; removed " + string.Join(", ", result.Removed) : ""));

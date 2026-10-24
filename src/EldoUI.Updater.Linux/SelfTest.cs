@@ -38,8 +38,13 @@ namespace EldoUI.Updater
 					var e = z.CreateEntry("EldoUI/EldoUI.toc");
 					using (var w = new StreamWriter(e.Open(), new UTF8Encoding(false))) w.Write("## Interface: 16001\n## Version: 0.7.0002\n");
 				}
-				var r = AddonInstaller.Install(zip, addOns, null);
+				var r = AddonInstaller.Install(zip, addOns, null, "0.7.0002");
 				Check(r.Version == "0.7.0002" && AddonInstaller.InstalledVersion(addOns) == "0.7.0002", "EldoUI installs into the prefix");
+				bool wrongVersion = false;
+				try { AddonInstaller.Install(zip, addOns, r.Folders, "0.7.0003"); }
+				catch (InvalidDataException) { wrongVersion = true; }
+				Check(wrongVersion && AddonInstaller.InstalledVersion(addOns) == "0.7.0002",
+					"a zip for another release is rejected before replacing EldoUI");
 
 				var s = new Settings { AddOnsDir = addOns };
 				string settingsPath = Path.Combine(home, "settings.json");

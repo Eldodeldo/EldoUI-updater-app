@@ -38,8 +38,13 @@ namespace EldoUI.Updater
 				var r1 = AddonInstaller.Install(zip1, addOns, null);
 				check(r1.Version == "0.7.0001" && AddonInstaller.InstalledVersion(addOns) == "0.7.0001", "first install");
 				string zip2 = MakeZip(root, "0.7.0002", "EldoUI", "EldoUI_LootData");
-				var r2 = AddonInstaller.Install(zip2, addOns, r1.Folders);
+				var r2 = AddonInstaller.Install(zip2, addOns, r1.Folders, "0.7.0002");
 				check(AddonInstaller.InstalledVersion(addOns) == "0.7.0002", "update installs the new version");
+				bool wrongVersion = false;
+				try { AddonInstaller.Install(zip1, addOns, r2.Folders, "0.7.0003"); }
+				catch (InvalidDataException) { wrongVersion = true; }
+				check(wrongVersion && AddonInstaller.InstalledVersion(addOns) == "0.7.0002",
+					"a zip for another release is rejected before replacing EldoUI");
 				check(!Directory.Exists(Path.Combine(addOns, "EldoUI_Old")) && r2.Removed.Contains("EldoUI_Old"), "a folder the release dropped is removed");
 				check(Directory.Exists(Path.Combine(addOns, "SomeOtherAddon")), "other addons are untouched");
 				check(Directory.GetDirectories(Path.GetDirectoryName(addOns), ".eldoui-updater-*").Length == 0, "no work folder is left behind");
