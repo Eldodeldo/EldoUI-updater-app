@@ -2,6 +2,11 @@
 
 Each release of the EldoUI Updater. The newest is at the top.
 
+## [Unreleased]
+
+### Fixed
+- Official EldoUI releases containing the Danish language addon now install correctly.
+
 ## [1.2.2] - 2026-10-22
 
 ### New

@@ -26,7 +26,7 @@ namespace EldoUI.Updater.Core
 	public static class AddonInstaller
 	{
 		public const string MainFolder = "EldoUI";
-		static readonly Regex FolderName = new Regex(@"^EldoUI(_[A-Za-z0-9]+)?$", RegexOptions.CultureInvariant);
+		static readonly Regex FolderName = new Regex(@"\AEldoUI(?:_[A-Za-z0-9]+)*\z", RegexOptions.CultureInvariant);
 		const long MaxUnpackedBytes = 512L * 1024 * 1024;
 		const int MaxEntries = 50000;
 

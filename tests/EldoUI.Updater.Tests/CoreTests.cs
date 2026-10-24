@@ -241,6 +241,46 @@ namespace EldoUI.Updater.Tests
 	public class InstallerTests
 	{
 		[Fact]
+		public void InstallsAndRemovesLocaleFoldersWithoutTouchingOtherAddons()
+		{
+			using (var t = new TempDir())
+			{
+				string addOns = t.Sub("AddOns");
+				Directory.CreateDirectory(Path.Combine(addOns, "OtherAddon"));
+				File.WriteAllText(Path.Combine(addOns, "OtherAddon", "keep.txt"), "keep");
+				string zip = Zips.Make(t.Path, "0.7.0002", "EldoUI", "EldoUI_Locale_daDK");
+				Assert.Contains("EldoUI_Locale_daDK", AddonInstaller.Inspect(zip));
+				var installed = AddonInstaller.Install(zip, addOns, null);
+				Assert.True(File.Exists(Path.Combine(addOns, "EldoUI_Locale_daDK", "EldoUI_Locale_daDK.toc")));
+				var updated = AddonInstaller.Install(Zips.Make(t.Path, "0.7.0003", "EldoUI"), addOns, installed.Folders);
+				Assert.Contains("EldoUI_Locale_daDK", updated.Removed);
+				Assert.False(Directory.Exists(Path.Combine(addOns, "EldoUI_Locale_daDK")));
+				Assert.Equal("keep", File.ReadAllText(Path.Combine(addOns, "OtherAddon", "keep.txt")));
+			}
+		}
+
+		[Theory]
+		[InlineData("EldoUI_")]
+		[InlineData("EldoUI__Locale")]
+		[InlineData("EldoUI_Locale_")]
+		[InlineData("EldoUI_Locale-daDK")]
+		[InlineData("Other_Locale_daDK")]
+		public void RefusesInvalidSegmentedFolderNames(string folder)
+		{
+			using (var t = new TempDir())
+				Assert.Throws<InvalidDataException>(() => AddonInstaller.Inspect(Zips.Make(t.Path, "1.0", "EldoUI", folder)));
+		}
+
+		[Fact]
+		public void LocaleFolderStillNeedsItsMatchingToc()
+		{
+			using (var t = new TempDir())
+				Assert.Throws<InvalidDataException>(() => AddonInstaller.Inspect(Zips.Raw(t.Path,
+					("EldoUI/EldoUI.toc", "## Version: 1.0"),
+					("EldoUI_Locale_daDK/EldoUI_Locale.toc", "## Version: 1.0"))));
+		}
+
+		[Fact]
 		public void InstallsUpdatesAndRemovesDroppedFolders()
 		{
 			using (var t = new TempDir())
