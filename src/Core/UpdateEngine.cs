@@ -77,9 +77,10 @@ namespace EldoUI.Updater.Core
 			await _gate.WaitAsync(ct).ConfigureAwait(false);
 			try
 			{
-				var r = new CheckResult { Installed = AddonInstaller.InstalledVersion(settings.AddOnsDir) };
+				var r = new CheckResult();
 				try
 				{
+					r.Installed = AddonInstaller.InstalledVersion(settings.AddOnsDir);
 					// The newest release that has its zip: a release without one (still being uploaded, or
 					// published without it) is skipped rather than reported as an error.
 					string body = await _web.GetApiAsync(_apiBase + "/repos/" + AddonRepo + "/releases?per_page=10", ct).ConfigureAwait(false);
@@ -93,7 +94,12 @@ namespace EldoUI.Updater.Core
 						return r;
 					}
 					r.Latest = r.Release.Version;
-					if (string.IsNullOrEmpty(settings.AddOnsDir) || !Directory.Exists(Path.GetDirectoryName(settings.AddOnsDir.TrimEnd('\\', '/')) ?? ""))
+					string interfaceDir = string.IsNullOrEmpty(settings.AddOnsDir) ? null
+						: Path.GetDirectoryName(settings.AddOnsDir.TrimEnd('\\', '/'));
+					bool hasInstallRoot = Directory.Exists(interfaceDir)
+						|| (WowFolders.Rank(settings.AddOnsDir) != int.MaxValue
+							&& Directory.Exists(Path.GetDirectoryName(interfaceDir ?? "")));
+					if (!hasInstallRoot)
 					{
 						r.Outcome = CheckOutcome.NoFolder;
 						return r;

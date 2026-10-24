@@ -241,6 +241,46 @@ namespace EldoUI.Updater.Tests
 	public class InstallerTests
 	{
 		[Fact]
+		public void InstallsAndRemovesLocaleFoldersWithoutTouchingOtherAddons()
+		{
+			using (var t = new TempDir())
+			{
+				string addOns = t.Sub("AddOns");
+				Directory.CreateDirectory(Path.Combine(addOns, "OtherAddon"));
+				File.WriteAllText(Path.Combine(addOns, "OtherAddon", "keep.txt"), "keep");
+				string zip = Zips.Make(t.Path, "0.7.0002", "EldoUI", "EldoUI_Locale_daDK");
+				Assert.Contains("EldoUI_Locale_daDK", AddonInstaller.Inspect(zip));
+				var installed = AddonInstaller.Install(zip, addOns, null);
+				Assert.True(File.Exists(Path.Combine(addOns, "EldoUI_Locale_daDK", "EldoUI_Locale_daDK.toc")));
+				var updated = AddonInstaller.Install(Zips.Make(t.Path, "0.7.0003", "EldoUI"), addOns, installed.Folders);
+				Assert.Contains("EldoUI_Locale_daDK", updated.Removed);
+				Assert.False(Directory.Exists(Path.Combine(addOns, "EldoUI_Locale_daDK")));
+				Assert.Equal("keep", File.ReadAllText(Path.Combine(addOns, "OtherAddon", "keep.txt")));
+			}
+		}
+
+		[Theory]
+		[InlineData("EldoUI_")]
+		[InlineData("EldoUI__Locale")]
+		[InlineData("EldoUI_Locale_")]
+		[InlineData("EldoUI_Locale-daDK")]
+		[InlineData("Other_Locale_daDK")]
+		public void RefusesInvalidSegmentedFolderNames(string folder)
+		{
+			using (var t = new TempDir())
+				Assert.Throws<InvalidDataException>(() => AddonInstaller.Inspect(Zips.Make(t.Path, "1.0", "EldoUI", folder)));
+		}
+
+		[Fact]
+		public void LocaleFolderStillNeedsItsMatchingToc()
+		{
+			using (var t = new TempDir())
+				Assert.Throws<InvalidDataException>(() => AddonInstaller.Inspect(Zips.Raw(t.Path,
+					("EldoUI/EldoUI.toc", "## Version: 1.0"),
+					("EldoUI_Locale_daDK/EldoUI_Locale.toc", "## Version: 1.0"))));
+		}
+
+		[Fact]
 		public void InstallsUpdatesAndRemovesDroppedFolders()
 		{
 			using (var t = new TempDir())
@@ -344,6 +384,23 @@ namespace EldoUI.Updater.Tests
 
 	public class WowFolderTests
 	{
+		[Theory]
+		[InlineData("_retail_")]
+		[InlineData("_classic_era_")]
+		[InlineData("_unrelated_")]
+		public void ExplicitSelectionRejectsOtherGameFolders(string flavor)
+		{
+			using (var t = new TempDir())
+			{
+				string root = t.Sub(flavor);
+				string addOns = Path.Combine(root, "Interface", "AddOns");
+				Directory.CreateDirectory(addOns);
+				Assert.Null(WowFolders.ResolveAddOns(root));
+				Assert.Null(WowFolders.ResolveAddOns(Path.GetDirectoryName(addOns)));
+				Assert.Null(WowFolders.ResolveAddOns(addOns));
+			}
+		}
+
 		[Fact]
 		public void ResolvesEveryLevelToAddOns()
 		{
@@ -653,6 +710,42 @@ namespace EldoUI.Updater.Tests
 
 	public class EngineTests
 	{
+		[Fact]
+		public async Task LockedInstalledVersionReturnsFailureAndCanRetry()
+		{
+			using (var t = new TempDir())
+			{
+				var (web, _) = Serve(t, "0.7.0002");
+				var settings = WithOldInstall(t);
+				var engine = new UpdateEngine(web, t.Sub("tmp"), null);
+				string toc = Path.Combine(settings.AddOnsDir, "EldoUI", "EldoUI.toc");
+				using (var locked = new FileStream(toc, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+				{
+					var result = await engine.CheckAsync(settings, false, CancellationToken.None);
+					Assert.Equal(CheckOutcome.Failed, result.Outcome);
+					Assert.NotNull(result.Error);
+					Assert.False(engine.Busy);
+				}
+				Assert.Equal(CheckOutcome.Installed, (await engine.CheckAsync(settings, false, CancellationToken.None)).Outcome);
+			}
+		}
+
+		[Fact]
+		public async Task InstallsIntoFreshForeverRootWithoutInterfaceFolder()
+		{
+			using (var t = new TempDir())
+			{
+				var (web, _) = Serve(t, "0.7.0002");
+				string root = t.Sub("WoW", "_forever_");
+				Directory.CreateDirectory(root);
+				var settings = new Settings { AddOnsDir = WowFolders.ResolveAddOns(root), AutoInstall = true };
+				Assert.False(Directory.Exists(Path.Combine(root, "Interface")));
+				var result = await new UpdateEngine(web, t.Sub("tmp"), null).CheckAsync(settings, false, CancellationToken.None);
+				Assert.Equal(CheckOutcome.Installed, result.Outcome);
+				Assert.Equal("0.7.0002", AddonInstaller.InstalledVersion(settings.AddOnsDir));
+			}
+		}
+
 		const string Latest = "https://api.github.com/repos/Eldodeldo/EldoUI/releases?per_page=10";
 
 		/// <summary>How a served release vouches for its zip.</summary>

@@ -216,7 +216,11 @@ namespace EldoUI.Updater
 		/// <summary>Checks for a new EldoUI. user: the player asked (show the result in the window). install: install even if automatic install is off.</summary>
 		async void Check(bool user, bool install)
 		{
-			if (_engine.Busy) return;
+			if (_engine.Busy)
+			{
+				if (user) ShowWindow();
+				return;
+			}
 			FindFolder();
 			if (string.IsNullOrEmpty(_settings.AddOnsDir))
 			{
@@ -231,6 +235,7 @@ namespace EldoUI.Updater
 			_view.Kind = StatusKind.Busy;
 			_view.Status = T.S("state.checking");
 			_form.Render(_view);
+			if (user && !_showPending) ShowWindow();
 			CheckResult r;
 			try
 			{
@@ -306,9 +311,16 @@ namespace EldoUI.Updater
 
 		void UpdateView(CheckResult r)
 		{
+			string installed = r != null ? r.Installed : null;
+			if (r == null)
+			{
+				try { installed = AddonInstaller.InstalledVersion(_settings.AddOnsDir); }
+				catch (IOException ex) { Log.Write("Could not read installed version: " + ex.Message); }
+				catch (UnauthorizedAccessException ex) { Log.Write("Could not read installed version: " + ex.Message); }
+			}
 			var v = new ViewState
 			{
-				Installed = AddonInstaller.InstalledVersion(_settings.AddOnsDir),
+				Installed = installed,
 				Latest = r != null ? r.Latest : _view.Latest,
 				Folder = _settings.AddOnsDir,
 				LastCheck = _settings.LastCheck,
@@ -367,12 +379,12 @@ namespace EldoUI.Updater
 		async Task CheckApp(bool booting)
 		{
 			if (!_settings.SelfUpdate || _appBusy) return;
-			var r = await _engine.NewerUpdaterAsync(Setup.Version, _quit.Token);
+			var result = await _engine.CheckUpdaterAsync(Setup.Version, _quit.Token);
+			if (result.Outcome == AppCheckOutcome.Unreachable) return;
+			var r = result.Outcome == AppCheckOutcome.Newer ? result.Release : null;
 			if (r == null)
 			{
-				// Also when GitHub could not be reached: a version already seen keeps its place.
-				bool reached = _last != null && _last.Outcome != CheckOutcome.Offline && _last.Outcome != CheckOutcome.Failed;
-				if (_app == null && reached && SelfUpdatePolicy.Clear(_settings)) Save();
+				if (_app == null && SelfUpdatePolicy.Clear(_settings)) Save();
 				return;
 			}
 			bool first = _app == null || _app.Version != r.Version;
@@ -469,7 +481,7 @@ namespace EldoUI.Updater
 			{
 				if (!string.IsNullOrEmpty(_settings.AddOnsDir))
 				{
-					try { dlg.SelectedPath = Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(_settings.AddOnsDir))); } catch { }
+					try { dlg.SelectedPath = Path.GetDirectoryName(Path.GetDirectoryName(_settings.AddOnsDir)); } catch { }
 				}
 				if (dlg.ShowDialog(_form.Visible ? _form : null) != DialogResult.OK) return;
 				string addOns = WowFolders.ResolveAddOns(dlg.SelectedPath);
