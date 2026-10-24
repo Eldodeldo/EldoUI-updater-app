@@ -469,7 +469,7 @@ namespace EldoUI.Updater
 			{
 				if (!string.IsNullOrEmpty(_settings.AddOnsDir))
 				{
-					try { dlg.SelectedPath = Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(_settings.AddOnsDir))); } catch { }
+					try { dlg.SelectedPath = Path.GetDirectoryName(Path.GetDirectoryName(_settings.AddOnsDir)); } catch { }
 				}
 				if (dlg.ShowDialog(_form.Visible ? _form : null) != DialogResult.OK) return;
 				string addOns = WowFolders.ResolveAddOns(dlg.SelectedPath);

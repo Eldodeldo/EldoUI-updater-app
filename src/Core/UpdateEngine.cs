@@ -93,7 +93,12 @@ namespace EldoUI.Updater.Core
 						return r;
 					}
 					r.Latest = r.Release.Version;
-					if (string.IsNullOrEmpty(settings.AddOnsDir) || !Directory.Exists(Path.GetDirectoryName(settings.AddOnsDir.TrimEnd('\\', '/')) ?? ""))
+					string interfaceDir = string.IsNullOrEmpty(settings.AddOnsDir) ? null
+						: Path.GetDirectoryName(settings.AddOnsDir.TrimEnd('\\', '/'));
+					bool hasInstallRoot = Directory.Exists(interfaceDir)
+						|| (WowFolders.Rank(settings.AddOnsDir) != int.MaxValue
+							&& Directory.Exists(Path.GetDirectoryName(interfaceDir ?? "")));
+					if (!hasInstallRoot)
 					{
 						r.Outcome = CheckOutcome.NoFolder;
 						return r;

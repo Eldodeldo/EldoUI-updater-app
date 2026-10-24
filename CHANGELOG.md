@@ -5,6 +5,7 @@ Each release of the EldoUI Updater. The newest is at the top.
 ## [Unreleased]
 
 ### Fixed
+- Select a fresh _forever_ game folder to install EldoUI; Interface and AddOns are created automatically.
 - Official EldoUI releases containing the Danish language addon now install correctly.
 
 ## [1.2.2] - 2026-10-22

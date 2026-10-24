@@ -693,6 +693,22 @@ namespace EldoUI.Updater.Tests
 
 	public class EngineTests
 	{
+		[Fact]
+		public async Task InstallsIntoFreshForeverRootWithoutInterfaceFolder()
+		{
+			using (var t = new TempDir())
+			{
+				var (web, _) = Serve(t, "0.7.0002");
+				string root = t.Sub("WoW", "_forever_");
+				Directory.CreateDirectory(root);
+				var settings = new Settings { AddOnsDir = WowFolders.ResolveAddOns(root), AutoInstall = true };
+				Assert.False(Directory.Exists(Path.Combine(root, "Interface")));
+				var result = await new UpdateEngine(web, t.Sub("tmp"), null).CheckAsync(settings, false, CancellationToken.None);
+				Assert.Equal(CheckOutcome.Installed, result.Outcome);
+				Assert.Equal("0.7.0002", AddonInstaller.InstalledVersion(settings.AddOnsDir));
+			}
+		}
+
 		const string Latest = "https://api.github.com/repos/Eldodeldo/EldoUI/releases?per_page=10";
 
 		/// <summary>How a served release vouches for its zip.</summary>
