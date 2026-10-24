@@ -2,9 +2,10 @@
 
 Each release of the EldoUI Updater. The newest is at the top.
 
-## [Unreleased]
+## [1.2.3] - 2026-10-24
 
 ### Fixed
+- Point at a failed update status to see its error details and retry.
 - A temporary connection failure no longer forgets a pending updater self-update.
 - Choosing a game folder now rejects other WoW versions and unrelated Interface/AddOns folders.
 - Manual checks from the tray show their progress and result, including when a check is already running.

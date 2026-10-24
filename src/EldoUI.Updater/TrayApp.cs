@@ -321,6 +321,7 @@ namespace EldoUI.Updater
 			var v = new ViewState
 			{
 				Installed = installed,
+				ErrorDetail = r != null ? r.Error : null,
 				Latest = r != null ? r.Latest : _view.Latest,
 				Folder = _settings.AddOnsDir,
 				LastCheck = _settings.LastCheck,
