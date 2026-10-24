@@ -17,6 +17,7 @@ namespace EldoUI.Updater
 		public DateTime? LastCheck;
 		public StatusKind Kind = StatusKind.Info;
 		public string Status = "";
+		public string ErrorDetail;
 		public MainAction Action = MainAction.Check;
 		public bool Busy;
 		public bool Autostart;
@@ -183,6 +184,7 @@ namespace EldoUI.Updater
 			try
 			{
 				_status.Text = s.Status;
+				_tips.SetToolTip(_status, s.ErrorDetail ?? "");
 				_installed.Text = s.Installed ?? T.S("value.none");
 				_latest.Text = s.Latest ?? T.S("value.unknown");
 				_folder.Text = string.IsNullOrEmpty(s.Folder) ? T.S("value.nofolder") : s.Folder;
