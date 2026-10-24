@@ -108,6 +108,9 @@ jobs:
           Copy-Item "src/EldoUI.Updater/bin/Release/net48/EldoUI Updater.exe" publish/EldoUI-Updater.exe
           $hash = (Get-FileHash publish/EldoUI-Updater.exe -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  EldoUI-Updater.exe" | Out-File -Encoding ascii publish/SHA256SUMS.txt
+          foreach ($lang in @("en", "da")) {
+            Copy-Item "snapshots/window-uptodate-$lang.png" "publish/updater-windows-$lang.png" -ErrorAction Stop
+          }
           Get-Content publish/SHA256SUMS.txt
           Write-Host "Size: $((Get-Item publish/EldoUI-Updater.exe).Length) bytes"
 
@@ -150,6 +153,12 @@ jobs:
         run: |
           APPIMAGE_EXTRACT_AND_RUN=1 ./publish/EldoUI-Updater-x86_64.AppImage --snapshot snapshots
           ls -l snapshots
+
+      - name: Stage release previews
+        run: |
+          for lang in en da; do
+            cp "snapshots/linux-uptodate-$lang.png" "publish/updater-linux-$lang.png"
+          done
 
       - name: Checksum
         run: |
@@ -214,6 +223,7 @@ jobs:
         if: steps.guard.outputs.publish == 'true'
         run: |
           mv publish-linux/EldoUI-Updater-x86_64.AppImage publish/
+          mv publish-linux/updater-linux-*.png publish/
           sed -i "s/\r$//" publish/SHA256SUMS.txt
           cat publish-linux/SHA256SUMS-linux.txt >> publish/SHA256SUMS.txt
           (cd publish && sha256sum -c SHA256SUMS.txt)
@@ -247,5 +257,5 @@ jobs:
           fi
           gh release create "v$VERSION" --repo "$GITHUB_REPOSITORY" --draft \
             --title "EldoUI Updater $VERSION" --notes-file notes.md --target "$GITHUB_SHA" \
-            publish/EldoUI-Updater.exe publish/EldoUI-Updater-x86_64.AppImage publish/SHA256SUMS.txt
+            publish/EldoUI-Updater.exe publish/EldoUI-Updater-x86_64.AppImage publish/SHA256SUMS.txt publish/updater-*.png
           gh release edit "v$VERSION" --repo "$GITHUB_REPOSITORY" --draft=false --latest
