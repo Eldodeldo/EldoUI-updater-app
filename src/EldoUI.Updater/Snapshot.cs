@@ -3,12 +3,18 @@ using System;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace EldoUI.Updater
 {
 	static class Snapshot
 	{
+		[DllImport("user32.dll", SetLastError = true)]
+		[return: MarshalAs(UnmanagedType.Bool)]
+		static extern bool PrintWindow(IntPtr hwnd, IntPtr target, uint flags);
+
 		public static int Run(string dir)
 		{
 			Directory.CreateDirectory(dir);
@@ -39,7 +45,16 @@ namespace EldoUI.Updater
 						Application.DoEvents();
 						using (var bmp = new Bitmap(form.Width, form.Height))
 						{
-							form.DrawToBitmap(bmp, new Rectangle(Point.Empty, form.Size));
+							// Capture the native non-client frame too; DrawToBitmap uses a different caption.
+							using (var graphics = Graphics.FromImage(bmp))
+							{
+								var target = graphics.GetHdc();
+								try
+								{
+									if (!PrintWindow(form.Handle, target, 2)) throw new Win32Exception();
+								}
+								finally { graphics.ReleaseHdc(target); }
+							}
 							// Each control again on top, so runtimes that leave them out of the form's picture still show them.
 							var client = form.PointToScreen(Point.Empty);
 							int dx = client.X - form.Left, dy = client.Y - form.Top;
