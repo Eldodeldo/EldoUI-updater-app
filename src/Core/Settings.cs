@@ -13,6 +13,9 @@ namespace EldoUI.Updater.Core
 		public string AddOnsDir = "";
 		/// <summary>Install a new EldoUI by itself. Off: only tell the player.</summary>
 		public bool AutoInstall = true;
+		public bool ExtraAddons;
+		public Dictionary<string, string> ExtraVersions = new Dictionary<string, string>();
+		public Dictionary<string, List<string>> ExtraFiles = new Dictionary<string, List<string>>();
 		/// <summary>Keep the updater itself up to date.</summary>
 		public bool SelfUpdate = true;
 		/// <summary>"auto" follows Windows, or "en" / "da".</summary>
@@ -38,6 +41,11 @@ namespace EldoUI.Updater.Core
 				var o = Json.ParseObject(File.ReadAllText(path, Encoding.UTF8));
 				s.AddOnsDir = o.Str("addOnsDir") ?? "";
 				s.AutoInstall = o.Bool("autoInstall", true);
+				s.ExtraAddons = o.Bool("extraAddons");
+				foreach (var item in o.Obj("extraVersions") ?? new Dictionary<string, object>())
+					if (item.Value is string) s.ExtraVersions[item.Key] = (string)item.Value;
+				foreach (var item in o.Obj("extraFiles") ?? new Dictionary<string, object>())
+					if (item.Value is List<object>) s.ExtraFiles[item.Key] = ((List<object>)item.Value).OfType<string>().ToList();
 				s.SelfUpdate = o.Bool("selfUpdate", true);
 				s.Language = o.Str("language") ?? "auto";
 				s.AnnouncedVersion = o.Str("announcedVersion") ?? "";
@@ -62,6 +70,9 @@ namespace EldoUI.Updater.Core
 			{
 				{ "addOnsDir", AddOnsDir ?? "" },
 				{ "autoInstall", AutoInstall },
+				{ "extraAddons", ExtraAddons },
+				{ "extraVersions", ExtraVersions.ToDictionary(p => p.Key, p => (object)p.Value) },
+				{ "extraFiles", ExtraFiles.ToDictionary(p => p.Key, p => (object)p.Value) },
 				{ "selfUpdate", SelfUpdate },
 				{ "language", Language ?? "auto" },
 				{ "installedFolders", InstalledFolders ?? new List<string>() },

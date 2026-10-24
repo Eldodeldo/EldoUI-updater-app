@@ -1,6 +1,7 @@
 // The updater as it lives in the notification area: the icon, its menu, the timer that checks
 // for a new EldoUI, and the window.
 using System;
+using System.Linq;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -62,6 +63,7 @@ namespace EldoUI.Updater
 			_form.OpenAddOnsClicked += OpenAddOns;
 			_form.AutostartChanged += on => SetAutostart(on);
 			_form.AutoInstallChanged += on => SetAutoInstall(on);
+			_form.ExtraAddonsChanged += on => { _settings.ExtraAddons = on; Save(); UpdateView(_last); if (on) Check(true, false); };
 			_form.AppUpdateClicked += () => InstallApp();
 
 			_menu = new ContextMenuStrip { Renderer = new MenuRenderer(), ShowImageMargin = false, ShowCheckMargin = true, Font = Theme.Body(9.5f), ForeColor = Theme.Text, BackColor = Theme.Panel };
@@ -143,7 +145,9 @@ namespace EldoUI.Updater
 			}
 			if (better == null || string.Equals(better, cur, StringComparison.OrdinalIgnoreCase)) return;
 			// A different game folder: what the last install put elsewhere is not ours to remove here.
-			if (valid) _settings.InstalledFolders.Clear();
+			_settings.InstalledFolders.Clear();
+			_settings.ExtraVersions.Clear();
+			_settings.ExtraFiles.Clear();
 			_settings.AddOnsDir = better;
 			Log.Write((valid ? "Moved to WoW: Forever AddOns at " : "Found WoW: Forever AddOns at ") + better);
 			Save();
@@ -327,6 +331,7 @@ namespace EldoUI.Updater
 				LastCheck = _settings.LastCheck,
 				Autostart = Setup.Autostart,
 				AutoInstall = _settings.AutoInstall,
+				ExtraAddons = _settings.ExtraAddons,
 				AppNew = _app != null ? _app.Version : null,
 				AppAt = _app != null ? (DateTime?)_appAt : null,
 				AppBusy = _appBusy,
@@ -365,6 +370,17 @@ namespace EldoUI.Updater
 						v.Kind = StatusKind.Error;
 						v.Status = r.Error != null && r.Error.Contains("wait") ? T.S("state.ratelimited") : T.S("state.failed");
 						break;
+				}
+			}
+			if (r != null && r.Companions != null && _settings.ExtraAddons)
+			{
+				v.ExtraStatus = string.Join("\n", r.Companions.Select(c => c.Name + ": " + T.S("extra." + c.Outcome) + (c.Error != null ? " (" + c.Error + ")" : "")));
+				bool pending = r.Companions.Any(c => c.Outcome == CompanionOutcome.Available);
+				if (pending) v.Action = MainAction.Update;
+				if (r.Companions.Any(c => c.Outcome == CompanionOutcome.Failed))
+				{
+					v.Kind = StatusKind.Warn;
+					v.Status = T.S("extras.partial");
 				}
 			}
 			_view = v;
@@ -478,6 +494,7 @@ namespace EldoUI.Updater
 
 		void ChooseFolder()
 		{
+			if (_engine.Busy) { ShowWindow(); return; }
 			using (var dlg = new FolderBrowserDialog { Description = T.S("folder.prompt"), ShowNewFolderButton = false })
 			{
 				if (!string.IsNullOrEmpty(_settings.AddOnsDir))
@@ -485,6 +502,7 @@ namespace EldoUI.Updater
 					try { dlg.SelectedPath = Path.GetDirectoryName(Path.GetDirectoryName(_settings.AddOnsDir)); } catch { }
 				}
 				if (dlg.ShowDialog(_form.Visible ? _form : null) != DialogResult.OK) return;
+				if (_engine.Busy) return;
 				string addOns = WowFolders.ResolveAddOns(dlg.SelectedPath);
 				if (addOns == null)
 				{
@@ -495,6 +513,8 @@ namespace EldoUI.Updater
 				{
 					// A different game folder: what the last install put elsewhere is not ours to remove here.
 					_settings.InstalledFolders.Clear();
+					_settings.ExtraVersions.Clear();
+					_settings.ExtraFiles.Clear();
 				}
 				_settings.AddOnsDir = addOns;
 				Save();

@@ -2,6 +2,12 @@
 
 Each release of the EldoUI Updater. The newest is at the top.
 
+## [1.2.4] - 2026-10-24
+
+### New
+- Choose Add the extra addons to install DBM, RestedXP and WeakAuras SharedMedia and check their official Forever releases alongside EldoUI.
+- Companion updates preserve your own files, including extra RestedXP guides, and keep each addon's update results separate.
+
 ## [1.2.3] - 2026-10-24
 
 ### Fixed
