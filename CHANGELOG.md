@@ -4,6 +4,17 @@ Each release of the EldoUI Updater. The newest is at the top.
 
 ## [1.2.7] - 2026-10-26
 
+### New
+- **Extra addons** is now a window with a catalog of about a hundred WoW: Forever addons. Search it, filter by category, and tick the addons the updater should install and keep up to date from their authors' own GitHub releases.
+- Each addon can be kept at your version, set to take pre-releases, or opened on its author's page. Addons from WoWInterface and TukUI are checked for new versions and linked, since those sites publish no checksum to install from.
+- The **Installed** list shows everything in your AddOns folder grouped by addon, marks addons not made for Forever and missing dependencies, and offers a catalog addon that another addon needs.
+- An addon you installed by hand is left alone until you choose to let the updater update it.
+- Export your addon choices to a file and import them on another PC.
+- Linux: the new **Linux setup** assistant checks your system and installs Lightforge, a free program that sets up Battle.net and WoW: Forever on Linux, from its official release with a checked checksum. It then shows what Lightforge reports and can point the updater at its WoW: Forever.
+
+### Improved
+- Addon installs refuse downloads that hold programs or scripts, links, or folders another addon already uses, before anything is changed.
+
 ### Fixed
 - An EldoUI download is always the one for the release the updater picked. If a zip holds a different EldoUI version, it is not installed and your current EldoUI stays as it is.
 
