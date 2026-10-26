@@ -128,6 +128,37 @@ namespace EldoUI.Updater.Tests
 		}
 
 		[Fact]
+		public void AddonsEldoUICoversCarryANote()
+		{
+			Assert.False(string.IsNullOrEmpty(AddonCatalog.CoverageVersion));
+			Assert.Equal(new[] { "Nameplates" }, AddonCatalog.Find("plater").CoveredBy.Select(m => m.Module));
+			Assert.True(AddonCatalog.Find("elvui").CoveredBy.Count > 3);
+			Assert.Empty(AddonCatalog.Find("dbm").CoveredBy);
+			Assert.All(AddonCatalog.All.SelectMany(e => e.CoveredBy), m => Assert.False(string.IsNullOrEmpty(m.English) || string.IsNullOrEmpty(m.Danish)));
+			Assert.Null(AddonRows.Covered(AddonCatalog.Find("dbm")));
+
+		}
+
+		[Fact]
+		public void TheCoverageListNamesOnlyCatalogAddons()
+		{
+			foreach (string id in Json.ParseObject(CoverageData.Json).Obj("addons").Keys)
+				Assert.NotNull(AddonCatalog.Find(id));
+		}
+
+		[Fact]
+		public void CoveredRowsShowTheNoteInBothLists()
+		{
+			using (var t = new TempDir())
+			{
+				var view = AddonRows.Sample(t.Sub("AddOns"));
+				Assert.NotNull(AddonRows.Find(view, "", null).Single(r => r.Key == "plater").Note);
+				Assert.Null(AddonRows.Find(view, "", null).Single(r => r.Key == "dbm").Note);
+				Assert.Contains(AddonRows.Installed(view, false), r => r.Note != null);
+			}
+		}
+
+		[Fact]
 		public void HiddenFoldersStayOutUntilAskedFor()
 		{
 			using (var t = new TempDir())

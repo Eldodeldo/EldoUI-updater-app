@@ -402,7 +402,14 @@ namespace EldoUI.Updater
 				TextRenderer.DrawText(g, row.Title, _name, new Rectangle(x, r.Top + Scaled(10), nameWidth, Scaled(18)), row.Tone == Tone.Info && row.Checked == null ? Theme.Accent : Theme.Text, flags);
 				if (!string.IsNullOrEmpty(row.Meta))
 					TextRenderer.DrawText(g, "  " + row.Meta, _text, new Rectangle(x + nameWidth, r.Top + Scaled(11), Math.Max(0, right - x - nameWidth - Scaled(150)), Scaled(18)), Theme.Muted, flags);
-				TextRenderer.DrawText(g, row.Detail ?? "", _text, new Rectangle(x, r.Top + Scaled(32), right - x - (row.Button != null ? Scaled(150) : 0), Scaled(18)), Theme.Muted, flags);
+				int detailWidth = right - x - (row.Button != null ? Scaled(150) : 0);
+				int noteWidth = 0;
+				if (!string.IsNullOrEmpty(row.Note))
+				{
+					noteWidth = Math.Min(TextRenderer.MeasureText(g, row.Note, _text, Size.Empty, flags).Width + Scaled(10), detailWidth);
+					TextRenderer.DrawText(g, row.Note, _text, new Rectangle(x, r.Top + Scaled(32), noteWidth, Scaled(18)), Theme.Gold, flags);
+				}
+				TextRenderer.DrawText(g, row.Detail ?? "", _text, new Rectangle(x + noteWidth, r.Top + Scaled(32), Math.Max(0, detailWidth - noteWidth), Scaled(18)), Theme.Muted, flags);
 				if (!string.IsNullOrEmpty(row.Status))
 				{
 					Color tone = row.Tone == Tone.Ok ? Theme.Ok : row.Tone == Tone.Warn ? Theme.Warn : row.Tone == Tone.Error ? Theme.Err : row.Tone == Tone.Info ? Theme.Accent : Theme.Muted;

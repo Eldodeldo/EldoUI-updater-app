@@ -29,6 +29,8 @@ namespace EldoUI.Updater.Core
 		public bool? Forever;
 		/// <summary>The companion definition from earlier versions (DBM, RestedXP, SharedMedia), or null.</summary>
 		public Companion Legacy;
+		/// <summary>The EldoUI modules that replace this addon one to one (CoverageData); empty when none.</summary>
+		public List<CoveringModule> CoveredBy = new List<CoveringModule>();
 
 		public AddonSource Source
 		{
@@ -74,6 +76,12 @@ namespace EldoUI.Updater.Core
 		Companion _package;
 	}
 
+	/// <summary>An EldoUI module that does an addon's whole job, with its name in English and Danish.</summary>
+	public sealed class CoveringModule
+	{
+		public string Module, English, Danish;
+	}
+
 	public static class AddonCatalog
 	{
 		static List<CatalogEntry> _all;
@@ -88,7 +96,7 @@ namespace EldoUI.Updater.Core
 		{
 			get
 			{
-				if (_all == null) _all = Load(CatalogData.Json);
+				if (_all == null) _all = WithCoverage(Load(CatalogData.Json), CoverageData.Json);
 				return _all;
 			}
 		}
@@ -104,6 +112,27 @@ namespace EldoUI.Updater.Core
 			if (string.IsNullOrEmpty(folder)) return null;
 			return All.FirstOrDefault(e => e.Folders.Contains(folder, StringComparer.OrdinalIgnoreCase))
 				?? All.FirstOrDefault(e => e.Legacy != null && e.Legacy.Owns(folder + "/"));
+		}
+
+		/// <summary>The EldoUI version the coverage notes were made from.</summary>
+		public static string CoverageVersion { get { return Json.ParseObject(CoverageData.Json).Str("eldoui"); } }
+
+		/// <summary>Adds which EldoUI modules replace each addon. Ids the catalog does not know are left out.</summary>
+		public static List<CatalogEntry> WithCoverage(List<CatalogEntry> list, string json)
+		{
+			var addons = Json.ParseObject(json).Obj("addons") ?? new Dictionary<string, object>();
+			foreach (var e in list)
+			{
+				object value;
+				if (!addons.TryGetValue(e.Id, out value) || !(value is List<object>)) continue;
+				foreach (var m in ((List<object>)value).OfType<Dictionary<string, object>>())
+				{
+					string en = m.Str("en");
+					if (string.IsNullOrEmpty(en)) continue;
+					e.CoveredBy.Add(new CoveringModule { Module = m.Str("module"), English = en, Danish = m.Str("da") ?? en });
+				}
+			}
+			return list;
 		}
 
 		/// <summary>The categories in the catalog, in alphabetical order.</summary>

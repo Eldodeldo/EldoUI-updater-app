@@ -24,6 +24,8 @@ namespace EldoUI.Updater
 	sealed class AddonRow
 	{
 		public string Key, Title, Meta, Detail, Status, Tip;
+		/// <summary>"EldoUI already does this: Bags", for an addon an EldoUI module replaces; null otherwise.</summary>
+		public string Note;
 		public Tone Tone;
 		/// <summary>The tick box: null when the row has none.</summary>
 		public bool? Checked;
@@ -50,6 +52,7 @@ namespace EldoUI.Updater
 					Tone = ToneOf(r.StatusKey),
 					Tip = r.Error,
 					Checked = r.CanSelect ? r.Selected : (bool?)null,
+					Note = Covered(r.Entry),
 				};
 				if (r.InUse) { row.Button = AddonAction.TakeOver; row.ButtonText = T.S("addons.takeover.short"); }
 				Choices(row, r);
@@ -93,6 +96,7 @@ namespace EldoUI.Updater
 					Meta = (a.State == AddonState.Managed && entry != null && view.Catalog.Any(c => c.Id == entry.Id && c.Held) ? T.S("extra.Held") : T.S("addons.state." + a.State.ToString().ToLowerInvariant()))
 						+ (string.IsNullOrEmpty(a.Version) ? "" : " · " + a.Version),
 					Detail = string.Join(", ", a.Folders),
+					Note = Covered(entry),
 					Tone = a.State == AddonState.Managed || a.State == AddonState.EldoUI || a.State == AddonState.GuideData ? Tone.Ok : Tone.Plain,
 				};
 				var notes = new List<string>();
@@ -119,6 +123,15 @@ namespace EldoUI.Updater
 				rows.Add(row);
 			}
 			return rows;
+		}
+
+		/// <summary>The note for an addon EldoUI's own modules replace, in the player's language; null when none does.</summary>
+		public static string Covered(CatalogEntry entry)
+		{
+			if (entry == null || entry.CoveredBy.Count == 0) return null;
+			var names = entry.CoveredBy.Select(m => T.Lang == "da" ? m.Danish : m.English).ToList();
+			string list = names.Count <= 3 ? string.Join(", ", names) : string.Join(", ", names.Take(3)) + " " + T.F("addons.covered.more", names.Count - 3);
+			return T.F("addons.covered", list);
 		}
 
 		public static int HiddenCount(AddonsView view) { return view.Installed.Count(a => a.Ignored); }

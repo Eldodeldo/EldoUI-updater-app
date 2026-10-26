@@ -204,6 +204,8 @@ namespace EldoUI.Updater
 			if (!string.IsNullOrEmpty(row.Meta)) title.Inlines.Add(new Avalonia.Controls.Documents.Run("  " + row.Meta) { FontSize = 11.5, Foreground = Palette.B(Palette.Muted) });
 			var detail = new TextBlock { Text = row.Detail ?? "", FontSize = 11.5, Foreground = Palette.B(Palette.Muted), TextTrimming = TextTrimming.CharacterEllipsis };
 			var text = new StackPanel { Spacing = 4, Children = { title, detail } };
+			if (!string.IsNullOrEmpty(row.Note))
+				text.Children.Insert(1, new TextBlock { Text = row.Note, FontSize = 11.5, Foreground = Palette.B(Palette.Gold), TextTrimming = TextTrimming.CharacterEllipsis });
 			if (!string.IsNullOrEmpty(row.Status))
 			{
 				Color tone = row.Tone == Tone.Ok ? Palette.Ok : row.Tone == Tone.Warn ? Palette.Warn : row.Tone == Tone.Error ? Palette.Err : row.Tone == Tone.Info ? Palette.Accent : Palette.Muted;

@@ -5,7 +5,7 @@
 A small tray app for Windows and Linux that keeps [EldoUI](https://github.com/Eldodeldo/EldoUI) up to date
 for **WoW: Forever**. When a new EldoUI is released, it installs it in your AddOns folder by itself. Your
 EldoUI settings stay as they are. It can also keep other addons you choose up to date (**Extra addons**),
-and on Linux it helps you install the game itself (**Linux setup**).
+and on Linux it helps you install the game itself (**WoW Linux setup**).
 
 - **Download:** [latest release](https://github.com/Eldodeldo/EldoUI-updater-app/releases/latest):
   `EldoUI-Updater.exe` for Windows, `EldoUI-Updater-x86_64.AppImage` for Linux.
@@ -42,7 +42,7 @@ On GNOME, the tray icon needs the *AppIndicator and KStatusNotifierItem Support*
 Without a tray the window opens instead. If the AppImage mentions FUSE, install your distribution's `fuse3`
 package.
 
-No WoW on Linux yet? See [Linux setup assistant](#linux-setup-assistant) below.
+No WoW on Linux yet? See [WoW Linux setup](#wow-linux-setup) below.
 
 The **This app** row also has a **Check update** button. It shows **Checking…** during a request
 and becomes **Update now** when a newer updater is ready.
@@ -50,7 +50,7 @@ and becomes **Update now** when a newer updater is ready.
 ## The menu
 
 Right-click the troll icon: check for updates now, check for an app update (it always tells you what it
-found), what's new, choose the WoW folder, open the AddOns folder, the Linux setup assistant (Linux only),
+found), what's new, choose the WoW folder, open the AddOns folder, WoW Linux setup (Linux only),
 install updates automatically (on or off), start with Windows or at login (on or off), language (English or
 Danish), EldoUI on GitHub, and exit.
 
@@ -76,13 +76,13 @@ Danish), EldoUI on GitHub, and exit.
   about you or your PC.
 - **Reads:** where your games are (Battle.net's settings and installed-games list, the registry on
   Windows, Wine prefixes on Linux), the `.toc` files in AddOns (to show what is installed and what it
-  needs), and on Linux, when you open the setup assistant, your distribution, glibc version, fonts and free
+  needs), and on Linux, when you open WoW Linux setup, your distribution, glibc version, fonts and free
   space.
 - **Opens:** pages on `github.com` and the addon publishers' own pages (CurseForge, WoWInterface, TukUI)
   for addons in the catalog. Other external pages are refused.
 - **First start:** a short notice says what the updater does and how to turn its automatic parts off.
 - **Writes:** EldoUI's folders and the folders of addons you chose in AddOns, and its own files (on Linux,
-  the installed AppImage is runnable only by your user). The Linux setup assistant writes Lightforge's
+  the installed AppImage is runnable only by your user). WoW Linux setup writes Lightforge's
   files only when you click its install button (see below).
 
 | What | Windows | Linux |
@@ -113,8 +113,9 @@ bash packaging/linux/build-appimage.sh publish
 
 `src/Core` holds everything without UI (GitHub answers, versions, checksums, zip checks and install, WoW
 folders, Wine prefixes, settings, the addon catalog, sources and scan) and is what the tests cover, with the
-Linux setup assistant's engine (`src/EldoUI.Updater.Linux/Lightforge.cs`). The catalog is rebuilt with
-`tools/build_catalog.py`. Both apps take `--selftest` and
+engine of WoW Linux setup (`src/EldoUI.Updater.Linux/Lightforge.cs`). The catalog is rebuilt with
+`tools/build_catalog.py`, and the notes on addons EldoUI already covers with `tools/build_coverage.py`
+from the source of each EldoUI release. Both apps take `--selftest` and
 `--snapshot <folder>`.
 
 To release, raise `<Version>` in `src/Directory.Build.props`, add its section at the top of `CHANGELOG.md`
@@ -138,6 +139,10 @@ it and keep it up to date with EldoUI. **Install selected addons** installs the 
 - **WoWInterface and TukUI** publish no checksum, so their addons are never installed by the updater. When
   you add one, the updater checks it for new versions and links to its page.
 - **Addons that only have a page** (CurseForge, for example) show a link to that page.
+- **EldoUI already does this.** An addon that an EldoUI module replaces one to one has a gold note naming
+  that module (in the catalog and in the Installed list), so you can skip it or turn the module off if you
+  prefer the addon. The notes follow EldoUI's own list of addons that do a module's job and are updated with
+  each EldoUI release.
 - **Your own copy stays yours.** If an addon is already in AddOns, put there by hand, the updater says so
   and does nothing until you click **Update it** and confirm. Files you added to its folders are kept.
 - **Choices per addon** (the **⋯** button): keep it at your version, take pre-releases, open its page, or
@@ -150,9 +155,9 @@ it and keep it up to date with EldoUI. **Install selected addons** installs the 
 - Updates keep files you added, install into a staging folder first and put the old folders back if
   anything fails; a backup that cannot be put back is kept, not deleted.
 
-## Linux setup assistant
+## WoW Linux setup
 
-On Linux, **Linux setup…** (window or tray menu) helps you install Battle.net and WoW: Forever with
+On Linux, **WoW Linux setup…** (window or tray menu) helps you install Battle.net and WoW: Forever with
 [Lightforge](https://github.com/LightforgeProject/lightforge), a free, separate program by its own authors
 (GPL-3.0-or-later).
 
@@ -179,7 +184,7 @@ Apache License 2.0 (see `LICENSE` and `NOTICE`). Made by Eldodeldo, as an AI-mad
 
 The addon catalog is adapted from [AddonForge](https://github.com/Topher121/AddonForge) (MIT License,
 Copyright (c) 2026 Pocket Forge Studios; full notice in `NOTICE`). [Lightforge](https://github.com/LightforgeProject/lightforge)
-is a separate program (GPL-3.0-or-later) that the Linux setup assistant downloads unchanged; it is not part
+is a separate program (GPL-3.0-or-later) that WoW Linux setup downloads unchanged; it is not part
 of the updater.
 
 EldoUI is not made by or affiliated with Blizzard Entertainment. World of Warcraft is a trademark of
