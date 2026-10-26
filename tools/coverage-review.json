@@ -8,7 +8,7 @@
 		"auto-spell-ranks": {"full": [], "part": ["ActionBars"], "works": []},
 		"azeriteui5-junnez": {"full": ["UnitFrames", "ActionBars", "Nameplates", "Minimap", "Chat", "Tooltip", "Auras", "Bags", "ObjectiveTracker", "Maps"], "part": [], "works": []},
 		"baganator": {"full": ["Bags", "Characters"], "part": [], "works": []},
-		"bagnon": {"full": ["Bags"], "part": [], "works": []},
+		"bagnon": {"full": ["Bags"], "part": ["Characters"], "works": []},
 		"bagsync": {"full": ["Characters", "Bags"], "part": [], "works": []},
 		"bankstack": {"full": ["Bags"], "part": [], "works": []},
 		"better-blizz-addons": {"full": [], "part": ["SystemUI"], "works": []},

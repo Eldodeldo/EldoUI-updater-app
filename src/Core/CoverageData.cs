@@ -141,6 +141,12 @@ namespace EldoUI.Updater.Core
 				""scope"": ""full"",
 				""en"": ""Bags"",
 				""da"": ""Tasker""
+			},
+			{
+				""module"": ""Characters"",
+				""scope"": ""part"",
+				""en"": ""Alts"",
+				""da"": ""Alts""
 			}
 		],
 		""bagsync"": [
