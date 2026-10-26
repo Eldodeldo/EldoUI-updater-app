@@ -615,6 +615,18 @@ namespace EldoUI.Updater.Tests
 		}
 
 		[Fact]
+		public void FindsLightforgesLibrary()
+		{
+			using (var t = new TempDir())
+			{
+				string forever = t.Sub("Games", "Blizzard", "games", "World of Warcraft", "_forever_");
+				Directory.CreateDirectory(forever);
+				Directory.CreateDirectory(t.Sub("Games", "Blizzard", "games", "World of Warcraft", "_retail_"));
+				Assert.Equal(Path.Combine(forever, "Interface", "AddOns"), WineFolders.Find(t.Path));
+			}
+		}
+
+		[Fact]
 		public void NoPrefixFindsNothing()
 		{
 			using (var t = new TempDir())

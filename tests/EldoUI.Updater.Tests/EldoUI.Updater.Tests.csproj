@@ -9,6 +9,8 @@
   <ItemGroup>
     <Compile Include="..\..\src\Core\*.cs" Link="Core\%(Filename)%(Extension)" />
     <Compile Include="..\..\src\EldoUI.Updater\Strings.cs" Link="Strings.cs" />
+    <!-- The Linux setup assistant's engine has no UI, so it is tested here too; its file tests run on Linux only. -->
+    <Compile Include="..\..\src\EldoUI.Updater.Linux\Lightforge.cs" Link="Linux\Lightforge.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
