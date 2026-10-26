@@ -17,6 +17,14 @@ namespace EldoUI.Updater.Core
 		public List<string> SelectedCompanions = new List<string> { "dbm", "rxp", "media" };
 		public Dictionary<string, string> ExtraVersions = new Dictionary<string, string>();
 		public Dictionary<string, List<string>> ExtraFiles = new Dictionary<string, List<string>>();
+		/// <summary>Addons kept at their installed version: the updater shows a newer one but does not install it.</summary>
+		public HashSet<string> Held = new HashSet<string>();
+		/// <summary>Addons that follow their publisher's test releases too. Stable releases only is the default.</summary>
+		public HashSet<string> PreRelease = new HashSet<string>();
+		/// <summary>Addons whose hand-installed folders the player agreed the updater takes over at the next install.</summary>
+		public HashSet<string> Adopted = new HashSet<string>();
+		/// <summary>AddOns folders the player chose not to see in the installed list.</summary>
+		public HashSet<string> IgnoredFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 		/// <summary>Keep the updater itself up to date.</summary>
 		public bool SelfUpdate = true;
 		/// <summary>"auto" follows Windows, or "en" / "da".</summary>
@@ -35,11 +43,19 @@ namespace EldoUI.Updater.Core
 
 		public void SelectCompanion(string id, bool selected)
 		{
-			if (!Companion.All.Any(a => a.Id == id)) throw new ArgumentException("Unknown companion addon.", nameof(id));
+			if (!Selectable(id)) throw new ArgumentException("Unknown companion addon.", nameof(id));
 			if (!ExtraAddons) SelectedCompanions.Clear();
 			SelectedCompanions.Remove(id);
 			if (selected) SelectedCompanions.Add(id);
+			else { Held.Remove(id); PreRelease.Remove(id); Adopted.Remove(id); }
 			ExtraAddons = SelectedCompanions.Count > 0;
+		}
+
+		/// <summary>A catalog addon the updater can install or check: not one that is only a page to open.</summary>
+		public static bool Selectable(string id)
+		{
+			var entry = AddonCatalog.Find(id);
+			return entry != null && entry.Source != AddonSource.Page;
 		}
 
 		public static Settings Load(string path)
@@ -52,11 +68,15 @@ namespace EldoUI.Updater.Core
 				s.AddOnsDir = o.Str("addOnsDir") ?? "";
 				s.AutoInstall = o.Bool("autoInstall", true);
 				s.ExtraAddons = o.Bool("extraAddons");
-				if (o.Arr("selectedCompanions") != null) s.SelectedCompanions = o.Arr("selectedCompanions").OfType<string>().Where(id => Companion.All.Any(a => a.Id == id)).Distinct().ToList();
+				if (o.Arr("selectedCompanions") != null) s.SelectedCompanions = o.Arr("selectedCompanions").OfType<string>().Where(Selectable).Distinct().ToList();
 				foreach (var item in o.Obj("extraVersions") ?? new Dictionary<string, object>())
 					if (item.Value is string) s.ExtraVersions[item.Key] = (string)item.Value;
 				foreach (var item in o.Obj("extraFiles") ?? new Dictionary<string, object>())
 					if (item.Value is List<object>) s.ExtraFiles[item.Key] = ((List<object>)item.Value).OfType<string>().ToList();
+				s.Held = Ids(o, "held");
+				s.PreRelease = Ids(o, "preRelease");
+				s.Adopted = Ids(o, "adopted");
+				s.IgnoredFolders = new HashSet<string>((o.Arr("ignoredFolders") ?? new List<object>()).OfType<string>(), StringComparer.OrdinalIgnoreCase);
 				s.SelfUpdate = o.Bool("selfUpdate", true);
 				s.Language = o.Str("language") ?? "auto";
 				s.AnnouncedVersion = o.Str("announcedVersion") ?? "";
@@ -85,6 +105,10 @@ namespace EldoUI.Updater.Core
 				{ "selectedCompanions", SelectedCompanions },
 				{ "extraVersions", ExtraVersions.ToDictionary(p => p.Key, p => (object)p.Value) },
 				{ "extraFiles", ExtraFiles.ToDictionary(p => p.Key, p => (object)p.Value) },
+				{ "held", Held.OrderBy(x => x, StringComparer.Ordinal).ToList() },
+				{ "preRelease", PreRelease.OrderBy(x => x, StringComparer.Ordinal).ToList() },
+				{ "adopted", Adopted.OrderBy(x => x, StringComparer.Ordinal).ToList() },
+				{ "ignoredFolders", IgnoredFolders.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList() },
 				{ "selfUpdate", SelfUpdate },
 				{ "language", Language ?? "auto" },
 				{ "installedFolders", InstalledFolders ?? new List<string>() },
@@ -100,6 +124,11 @@ namespace EldoUI.Updater.Core
 			File.WriteAllText(tmp, Json.Write(o), new UTF8Encoding(false));
 			if (File.Exists(path)) File.Replace(tmp, path, null);
 			else File.Move(tmp, path);
+		}
+
+		static HashSet<string> Ids(Dictionary<string, object> o, string key)
+		{
+			return new HashSet<string>((o.Arr(key) ?? new List<object>()).OfType<string>().Where(Selectable));
 		}
 
 		static DateTime? Time(string text)

@@ -30,6 +30,12 @@ namespace EldoUI.Updater.Core
 		const long MaxUnpackedBytes = 512L * 1024 * 1024;
 		const int MaxEntries = 50000;
 
+		/// <summary>True for a folder name EldoUI itself uses (EldoUI, EldoUI_LootData, ...). No other addon may install one.</summary>
+		public static bool IsEldoUIFolder(string name)
+		{
+			return name != null && FolderName.IsMatch(name);
+		}
+
 		/// <summary>The top folders in the zip, checked. Throws InvalidDataException when the zip is not an EldoUI release.</summary>
 		public static List<string> Inspect(string zipPath)
 		{

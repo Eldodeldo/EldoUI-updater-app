@@ -1,4 +1,5 @@
-// HTTPS to GitHub's public API and release downloads. No account and no token: only public data.
+// HTTPS to GitHub's public API and release downloads, and the public version APIs of WoWInterface and TukUI for
+// addons the player added from them. No account and no token: only public data.
 using System;
 using System.IO;
 using System.Net;
@@ -33,12 +34,28 @@ namespace EldoUI.Updater.Core
 			_http.DefaultRequestHeaders.UserAgent.ParseAdd(userAgent);
 		}
 
+		/// <summary>The only APIs the app asks: GitHub's, and WoWInterface's and TukUI's addon version lists.</summary>
+		public static bool IsAllowedApi(string url)
+		{
+			Uri u;
+			if (!Uri.TryCreate(url, UriKind.Absolute, out u) || u.Scheme != Uri.UriSchemeHttps || !u.IsDefaultPort || u.UserInfo.Length > 0) return false;
+			return string.Equals(u.Host, "api.github.com", StringComparison.OrdinalIgnoreCase)
+				|| (string.Equals(u.Host, "api.mmoui.com", StringComparison.OrdinalIgnoreCase) && u.AbsolutePath.StartsWith("/v3/game/WOW/filedetails/", StringComparison.Ordinal))
+				|| (string.Equals(u.Host, "api.tukui.org", StringComparison.OrdinalIgnoreCase) && u.AbsolutePath.StartsWith("/v1/addon/", StringComparison.Ordinal));
+		}
+
 		public async Task<string> GetApiAsync(string url, CancellationToken ct)
 		{
+			if (!IsAllowedApi(url)) throw new WebFailure(WebFailureKind.Other, "Refused a request to an unknown site.");
+			bool github = new Uri(url).Host.Equals("api.github.com", StringComparison.OrdinalIgnoreCase);
 			using (var req = new HttpRequestMessage(HttpMethod.Get, url))
 			{
-				req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
-				req.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
+				if (github)
+				{
+					req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+					req.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
+				}
+				else req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 				Tuple<string, string> cached;
 				lock (_etags) _etags.TryGetValue(url, out cached);
 				// An unchanged answer (304) does not count against GitHub's hourly limit.
@@ -46,9 +63,10 @@ namespace EldoUI.Updater.Core
 				using (var res = await _http.SendAsync(req, ct).ConfigureAwait(false))
 				{
 					if (res.StatusCode == HttpStatusCode.NotModified && cached != null) return cached.Item2;
+					string site = github ? "GitHub" : new Uri(url).Host;
 					if (res.StatusCode == HttpStatusCode.NotFound) throw new WebFailure(WebFailureKind.NoRelease, "No release yet.");
-					if ((int)res.StatusCode == 403 || (int)res.StatusCode == 429) throw new WebFailure(WebFailureKind.RateLimited, "GitHub asks to wait a while.");
-					if (!res.IsSuccessStatusCode) throw new WebFailure(WebFailureKind.Other, "GitHub answered " + (int)res.StatusCode + ".");
+					if ((int)res.StatusCode == 403 || (int)res.StatusCode == 429) throw new WebFailure(WebFailureKind.RateLimited, site + " asks to wait a while.");
+					if (!res.IsSuccessStatusCode) throw new WebFailure(WebFailureKind.Other, site + " answered " + (int)res.StatusCode + ".");
 					string body = await res.Content.ReadAsStringAsync().ConfigureAwait(false);
 					var tag = res.Headers.ETag;
 					if (tag != null)
