@@ -8,7 +8,7 @@ those publishers only, and installs only what has a published SHA-256 checksum.
 What this script changes from the upstream file:
 - Wago fields are dropped, and an entry that is only on Wago is left out.
 - RestedXP takes the id the updater already uses ("rxp"), so saved choices keep working.
-- A few descriptions and notices are rewritten so they describe the addon, not another app.
+- A few descriptions, notices and links are rewritten so they describe the addon, not another app.
 - Bundles, featured spots and download statistics are not used.
 Moving the pinned commit forward is done through an issue, with the diff of the catalog reviewed.
 """
@@ -28,7 +28,11 @@ DESC = {
 	"bagnon": "Bag addon.",
 	"whats-training": "Shows trainable spells.",
 	"questie": "Quest helper. Its Forever version is not released yet.",
+	"details": "Damage meter.",
+	"elvui": "Full UI replacement. TukUI has no Forever build of it yet; the updater shows when one is listed.",
 }
+# Pages that replace the upstream link: Details! keeps the CurseForge page the updater has always opened for it.
+URL = {"details": "https://www.curseforge.com/wow/addons/details"}
 NOTICE = {
 	"gatherlite": "The newest GitHub release is not a Forever build.",
 	"svshim": "Beta workaround: remove it once saved variables load normally again.",
@@ -58,6 +62,9 @@ def main():
 			e["desc"] = DESC[a["id"]]
 		if a["id"] in NOTICE:
 			e["notice"] = NOTICE[a["id"]]
+		if a["id"] in URL:
+			e["url"] = URL[a["id"]]
+			e.pop("forever", None)
 		for k, v in e.items():
 			if isinstance(v, str) and re.search(r"(?i)wago|addonforge|pocket forge", v):
 				sys.exit("entry %s still names another app in %s: %s" % (a["id"], k, v))

@@ -25,6 +25,7 @@ namespace EldoUI.Updater
 		readonly NotifyIcon _tray;
 		readonly ContextMenuStrip _menu;
 		readonly MainForm _form;
+		readonly AddonsForm _addons;
 		readonly System.Windows.Forms.Timer _timer;
 		readonly SynchronizationContext _ui;
 		readonly ToolStripMenuItem _miStatus, _miAuto, _miStartup, _miLangAuto, _miLangEn, _miLangDa, _miNotes;
@@ -64,17 +65,16 @@ namespace EldoUI.Updater
 			_form.AutostartChanged += on => SetAutostart(on);
 			_form.AutoInstallChanged += on => SetAutoInstall(on);
 
-			_form.CompanionChanged += (id, on) => {
+			_form.ExtrasClicked += ShowAddons;
+			_addons = new AddonsForm(Assets.Icon(false));
+			_addons.ActionRequested += OnAddonAction;
+			_addons.InstallClicked += all => {
 				if (_engine.Busy) return;
-				_settings.SelectCompanion(id, on);
-				Save(); UpdateView(null);
+				if (all) { foreach (var a in Companion.All) _settings.SelectCompanion(a.Id, true); }
+				Save(); Check(true, false, true, false);
 			};
-			_form.InstallExtrasClicked += all => {
-				if (_engine.Busy) return;
-				if (all) { _settings.SelectedCompanions = Companion.All.Select(a => a.Id).ToList(); _settings.ExtraAddons = true; }
-				Save(); Check(true, false, true);
-			};
-			_form.DetailsClicked += () => OpenUrl(Release.DetailsPage);
+			_addons.ImportChosen += ImportAddons;
+			_addons.ExportChosen += ExportAddons;
 
 			_form.AppUpdateClicked += () => InstallApp();
 			_form.AppCheckClicked += CheckAppNow;
@@ -212,6 +212,7 @@ namespace EldoUI.Updater
 			_miSite.Text = T.S("menu.site");
 			_miExit.Text = T.S("menu.exit");
 			_form.ApplyTexts();
+			_addons.ApplyTexts();
 		}
 
 		void RefreshMenu()
@@ -231,19 +232,19 @@ namespace EldoUI.Updater
 		}
 
 		/// <summary>Checks for a new EldoUI. user: the player asked (show the result in the window). install: install even if automatic install is off.</summary>
-		async void Check(bool user, bool install, bool installExtras = false)
+		async void Check(bool user, bool install, bool installExtras = false, bool showWindow = true)
 		{
 			if (_engine.Busy)
 			{
-				if (user) ShowWindow();
+				if (user && showWindow) ShowWindow();
 				return;
 			}
 			FindFolder();
 			if (string.IsNullOrEmpty(_settings.AddOnsDir))
 			{
 				UpdateView(null);
-				if (user) ShowWindow();
-				else if (!_settings.Welcomed) Toast(T.S("toast.nofolder.title"), T.S("toast.nofolder.body"), ToolTipIcon.Info, "folder");
+				if (user && showWindow) ShowWindow();
+				else if (!user && !_settings.Welcomed) Toast(T.S("toast.nofolder.title"), T.S("toast.nofolder.body"), ToolTipIcon.Info, "folder");
 				_settings.Welcomed = true;
 				Save();
 				// Still look up the newest version, so the window can show it.
@@ -252,7 +253,8 @@ namespace EldoUI.Updater
 			_view.Kind = StatusKind.Busy;
 			_view.Status = T.S("state.checking");
 			_form.Render(_view);
-			if (user && !_showPending) ShowWindow();
+			RefreshAddons(true);
+			if (user && showWindow && !_showPending) ShowWindow();
 			CheckResult r;
 			try
 			{
@@ -344,8 +346,6 @@ namespace EldoUI.Updater
 				LastCheck = _settings.LastCheck,
 				Autostart = Setup.Autostart,
 				AutoInstall = _settings.AutoInstall,
-				ExtraAddons = _settings.ExtraAddons,
-				SelectedCompanions = _settings.SelectedCompanions.ToArray(),
 				AppNew = _app != null ? _app.Version : null,
 				AppAt = _app != null ? (DateTime?)_appAt : null,
 				AppBusy = _appBusy,
@@ -392,7 +392,7 @@ namespace EldoUI.Updater
 				v.ExtraStatus = string.Join("\n", r.Companions.Select(c => c.Name + ": " + T.S("extra." + c.Outcome) + (c.Error != null ? " (" + c.Error + ")" : "")));
 				bool pending = r.Companions.Any(c => c.Outcome == CompanionOutcome.Available);
 				if (pending) v.Action = MainAction.Update;
-				if (r.Companions.Any(c => c.Outcome == CompanionOutcome.Failed))
+				if (r.Companions.Any(c => c.Outcome == CompanionOutcome.Failed || c.Outcome == CompanionOutcome.InUse))
 				{
 					v.Kind = StatusKind.Warn;
 					v.Status = T.S("extras.partial");
@@ -400,6 +400,7 @@ namespace EldoUI.Updater
 			}
 			_view = v;
 			_form.Render(v);
+			RefreshAddons(false);
 			string tip = v.Installed != null ? T.F("tip.idle", v.Installed) : T.S("tip.idle.none");
 			_tray.Text = tip.Length > 63 ? tip.Substring(0, 63) : tip;
 		}
@@ -559,6 +560,78 @@ namespace EldoUI.Updater
 			UpdateView(_last);
 		}
 
+		void ShowAddons()
+		{
+			RefreshAddons(_engine.Busy, true);
+			if (!_addons.Visible) _addons.Show();
+			if (_addons.WindowState == FormWindowState.Minimized) _addons.WindowState = FormWindowState.Normal;
+			_addons.Activate();
+		}
+
+		/// <summary>Shows the settings, the last results and what is in the AddOns folder now in the Extra addons window.</summary>
+		void RefreshAddons(bool busy, bool force = false)
+		{
+			if (_addons == null || (!force && !_addons.Visible)) return;
+			var installed = new System.Collections.Generic.List<InstalledAddon>();
+			try { installed = AddonScanner.Scan(_settings.AddOnsDir, _settings); }
+			catch (IOException ex) { Log.Write("Could not read the AddOns folder: " + ex.Message); }
+			catch (UnauthorizedAccessException ex) { Log.Write("Could not read the AddOns folder: " + ex.Message); }
+			_addons.Render(AddonsView.Build(_settings, _last != null ? _last.Companions : null, installed, busy));
+		}
+
+		void OnAddonAction(AddonAction action, string arg)
+		{
+			if (action == AddonAction.OpenPage)
+			{
+				var entry = AddonCatalog.Find(arg);
+				if (entry != null && entry.PageUrl != null) OpenUrl(entry.PageUrl);
+				return;
+			}
+			if (_engine.Busy || !AddonRows.Apply(_settings, action, arg)) return;
+			Save();
+			_addons.ShowMessage("");
+			// The player confirmed the take-over in the window; the check installs it over the hand-installed copy.
+			if (action == AddonAction.TakeOver || action == AddonAction.Add) Check(true, false, true, false);
+			else UpdateView(_last);
+			RefreshAddons(_engine.Busy);
+		}
+
+		void ImportAddons(string path)
+		{
+			try
+			{
+				var info = new FileInfo(path);
+				if (info.Length > AddonList.MaxBytes) throw new FormatException("too large");
+				System.Collections.Generic.List<string> unknown;
+				var choices = AddonList.Import(File.ReadAllText(path), out unknown);
+				int added = AddonList.Apply(_settings, choices);
+				Save();
+				UpdateView(_last);
+				string text = T.F("addons.import.done", added);
+				if (unknown.Count > 0) text += " " + T.F("addons.import.unknown", string.Join(", ", unknown));
+				_addons.ShowMessage(text, unknown.Count > 0);
+			}
+			catch (Exception ex) when (ex is FormatException || ex is IOException || ex is UnauthorizedAccessException)
+			{
+				Log.Write("Addon list not imported: " + ex.Message);
+				_addons.ShowMessage(T.S("addons.import.bad"), true);
+			}
+		}
+
+		void ExportAddons(string path)
+		{
+			try
+			{
+				File.WriteAllText(path, AddonList.Export(_settings));
+				_addons.ShowMessage(T.S("addons.export.done"));
+			}
+			catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+			{
+				Log.Write("Addon list not saved: " + ex.Message);
+				_addons.ShowMessage(ex.Message, true);
+			}
+		}
+
 		void SetAutoInstall(bool on)
 		{
 			_settings.AutoInstall = on;
@@ -594,7 +667,7 @@ namespace EldoUI.Updater
 
 		static void OpenUrl(string url)
 		{
-			// Only pages on github.com: the app never opens any other address.
+			// Only GitHub and the addon publishers' own pages: the app never opens any other address.
 			if (!Release.IsAllowedPage(url)) { Log.Write("Refused to open an unapproved page"); return; }
 			try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); } catch { }
 		}
@@ -614,6 +687,7 @@ namespace EldoUI.Updater
 			_tray.Dispose();
 			_form.AllowClose = true;
 			_form.Close();
+			_addons.Dispose();
 			ExitThread();
 		}
 	}

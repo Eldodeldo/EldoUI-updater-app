@@ -26,6 +26,7 @@
   <ItemGroup>
     <Compile Include="..\Core\*.cs" Link="Core\%(Filename)%(Extension)" />
     <Compile Include="..\EldoUI.Updater\Strings.cs" Link="Shared\Strings.cs" />
+    <Compile Include="..\EldoUI.Updater\AddonRows.cs" Link="Shared\AddonRows.cs" />
     <EmbeddedResource Include="Assets\logo.png" />
     <!-- Linux only: the analyzer then accepts Unix-only calls such as file modes. -->
     <AssemblyAttribute Include="System.Runtime.Versioning.SupportedOSPlatformAttribute">

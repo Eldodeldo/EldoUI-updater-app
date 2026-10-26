@@ -1254,7 +1254,7 @@ namespace EldoUI.Updater.Core
 		{
 			""id"": ""elvui"",
 			""name"": ""ElvUI"",
-			""desc"": ""Full UI replacement. No Forever build yet: TukUI lists 12.1.0 / 5.5.4 / 1.15.9 / 2.5.6 only. Will install here the moment they add 1.60."",
+			""desc"": ""Full UI replacement. TukUI has no Forever build of it yet; the updater shows when one is listed."",
 			""category"": ""UI"",
 			""tukui"": ""elvui"",
 			""url"": ""https://tukui.org/elvui"",
@@ -1281,14 +1281,13 @@ namespace EldoUI.Updater.Core
 		{
 			""id"": ""details"",
 			""name"": ""Details! Damage Meter"",
-			""desc"": ""No Forever build: Forever ships its own damage meter and blocks the data."",
+			""desc"": ""Damage meter."",
 			""category"": ""Combat"",
 			""curse"": 61284,
-			""url"": ""https://github.com/Tercioo/Details-Damage-Meter"",
+			""url"": ""https://www.curseforge.com/wow/addons/details"",
 			""folders"": [
 				""Details""
-			],
-			""forever"": false
+			]
 		},
 		{
 			""id"": ""prat"",

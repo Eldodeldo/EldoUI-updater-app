@@ -2,6 +2,7 @@
 // CI runs it on Windows; the unit tests cover the same code in more detail.
 using System;
 using System.IO;
+using System.Linq;
 using System.IO.Compression;
 using System.Text;
 using System.Drawing;
@@ -52,11 +53,9 @@ namespace EldoUI.Updater
 				using (var form = new MainForm(Assets.Icon(false), Assets.Logo()) {
 					StartPosition = FormStartPosition.Manual, Location = new Point(-3000, -3000), ShowInTaskbar = false })
 				{
-					form.Render(new ViewState { ExtraAddons = true, SelectedCompanions = new[] { "dbm" } });
-					bool installAll = false, installSelected = false, details = false, uncheckedDbm = false;
-					form.InstallExtrasClicked += all => { if (all) installAll = true; else installSelected = true; };
-					form.DetailsClicked += () => details = true;
-					form.CompanionChanged += (id, selected) => uncheckedDbm = id == "dbm" && !selected;
+					form.Render(new ViewState());
+					int extras = 0;
+					form.ExtrasClicked += () => extras++;
 					form.Show();
 					int appChecks = 0, appUpdates = 0;
 					form.AppCheckClicked += () => appChecks++;
@@ -70,24 +69,43 @@ namespace EldoUI.Updater
 					form.Render(new ViewState { AppNew = "9.9.9" });
 					appButton.PerformClick();
 					check(appUpdates == 1 && appChecks == 1 && appButton.Text == T.S("btn.update"), "the same app button switches to Update now");
-					form.Render(new ViewState { ExtraAddons = true, SelectedCompanions = new[] { "dbm" } });
-
-					var show = typeof(MainForm).GetMethod("ShowCompanions", BindingFlags.Instance | BindingFlags.NonPublic);
-					show.Invoke(form, null);
-					var menu = (ContextMenuStrip) typeof(MainForm).GetField("_companionMenu", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(form);
-					var allItem = menu.Items[5];
-					menu.Close();
-					check(!menu.IsDisposed, "closing the companion menu keeps the click target alive");
-					allItem.PerformClick();
-					check(installAll, "Install all still runs after the menu closes");
-					show.Invoke(form, null);
-					menu.Close();
-					menu.Items[4].PerformClick();
-					menu.Items[0].PerformClick();
-					menu.Items[7].PerformClick();
-					check(installSelected && uncheckedDbm && details, "reopening preserves selected-install, checkmark and Details actions");
+					var extrasButton = (Button) typeof(MainForm).GetField("_extras", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(form);
+					extrasButton.PerformClick();
+					check(extras == 1, "the extra addons button opens the addons window");
 					form.AllowClose = true;
 					form.Close();
+				}
+
+				using (var addonsForm = new AddonsForm(Assets.Icon(false)) { StartPosition = FormStartPosition.Manual, Location = new Point(-3000, -3000), ShowInTaskbar = false })
+				{
+					var settings = new Settings { AddOnsDir = addOns };
+					settings.SelectCompanion("dbm", true);
+					var actions = new System.Collections.Generic.List<string>();
+					addonsForm.ActionRequested += (action, arg) => actions.Add(action + ":" + arg);
+					bool installSelected = false, installAll = false;
+					addonsForm.InstallClicked += all => { if (all) installAll = true; else installSelected = true; };
+					addonsForm.Show();
+					addonsForm.Render(AddonsView.Build(settings, null, AddonScanner.Scan(addOns, settings), false));
+					var list = (RowList) typeof(AddonsForm).GetField("_list", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(addonsForm);
+					check(list.Rows.Count >= AddonCatalog.All.Count - 5 && list.Rows[0].Key == "dbm" && list.Rows[0].Checked == true, "the catalog lists the player's addons first");
+					check(list.Rows.Any(r => r.Key == "details" && r.Checked == null && r.Menu.Any(m => m.Action == AddonAction.OpenPage)), "an addon without a Forever download only links to its page");
+					var search = (TextBox) typeof(AddonsForm).GetField("_search", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(addonsForm);
+					int everything = list.Rows.Count;
+					search.Text = "Deadly Boss";
+					check(list.Rows.Count < everything && list.Rows.Any(r => r.Key == "dbm"), "searching narrows the list");
+					search.Text = "";
+					var install = (Button) typeof(AddonsForm).GetField("_install", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(addonsForm);
+					var recommended = (Button) typeof(AddonsForm).GetField("_recommended", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(addonsForm);
+					install.PerformClick();
+					recommended.PerformClick();
+					check(installSelected && installAll, "Install selected and Install all recommended reach the updater");
+					var tabInstalled = (Button) typeof(AddonsForm).GetField("_tabInstalled", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(addonsForm);
+					tabInstalled.PerformClick();
+					check(list.Rows.Any(r => r.Title == "SomeOtherAddon" && r.Menu.Any(m => m.Action == AddonAction.Hide)), "the installed list shows other addons and lets the player hide them");
+					addonsForm.Render(AddonsView.Build(settings, null, AddonScanner.Scan(addOns, settings), true));
+					check(!install.Enabled && !recommended.Enabled, "nothing can be installed while a check runs");
+					check(actions.Count == 0, "rendering never changes a choice by itself");
+					addonsForm.Dispose();
 				}
 
 				string bad = Path.Combine(root, "bad.zip");

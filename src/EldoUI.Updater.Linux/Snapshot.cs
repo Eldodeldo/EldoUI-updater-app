@@ -49,8 +49,52 @@ namespace EldoUI.Updater
 					if (frame != null) count++;
 				}
 			}
+			string sample = Path.Combine(Path.GetTempPath(), "eldoui-updater-snapshot-" + Guid.NewGuid().ToString("N").Substring(0, 8));
+			try
+			{
+				var system = LightforgeChecks.Evaluate(new SystemInfo { Distribution = "Ubuntu 24.04.3 LTS", Architecture = "x86_64", Glibc = "2.39", FreeBytes = 120L * 1024 * 1024 * 1024, HasFonts = true, Has32BitLoader = false });
+				var setups = new[]
+				{
+					Tuple.Create("new", new LightforgeStatus()),
+					Tuple.Create("installed", new LightforgeStatus { Installed = true, Version = LightforgePackage.Version, Known = true, Ready = false, Outstanding = { "Proton", "Prefix", "BattleNet" }, ForeverDir = "/home/player/Games/Blizzard/games/World of Warcraft/_forever_" }),
+				};
+				foreach (string lang in new[] { "en", "da" })
+				{
+					LinuxTexts.Use(lang);
+					var view = AddonRows.Sample(Path.Combine(sample, "AddOns"));
+					var addons = new AddonsWindow(Assets.Logo());
+					addons.Show();
+					addons.Render(view);
+					count += Save(addons, Path.Combine(dir, "linux-addons-find-" + lang + ".png"));
+					addons.ShowInstalled(true);
+					count += Save(addons, Path.Combine(dir, "linux-addons-installed-" + lang + ".png"));
+					addons.AllowClose = true;
+					addons.Close();
+					foreach (var st in setups)
+					{
+						var setup = new SetupWindow(Assets.Logo(), null, null, "/home/player", null, sample);
+						setup.Show();
+						setup.Render(system, st.Item2);
+						count += Save(setup, Path.Combine(dir, "linux-setup-" + st.Item1 + "-" + lang + ".png"));
+						setup.AllowClose = true;
+						setup.Close();
+					}
+				}
+			}
+			finally
+			{
+				try { Directory.Delete(sample, true); } catch { }
+			}
 			Console.WriteLine(count + " pictures in " + Path.GetFullPath(dir));
 			return count > 0 ? 0 : 1;
+		}
+
+		static int Save(Avalonia.Controls.Window w, string path)
+		{
+			var frame = w.CaptureRenderedFrame();
+			if (frame == null) return 0;
+			frame.Save(path);
+			return 1;
 		}
 	}
 }

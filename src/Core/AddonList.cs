@@ -16,7 +16,7 @@ namespace EldoUI.Updater.Core
 	public static class AddonList
 	{
 		public const string Format = "eldoui-addons";
-		const int MaxLength = 64 * 1024;
+		public const int MaxBytes = 64 * 1024;
 
 		public static string Export(Settings settings)
 		{
@@ -35,7 +35,7 @@ namespace EldoUI.Updater.Core
 		public static List<AddonChoice> Import(string text, out List<string> unknown)
 		{
 			unknown = new List<string>();
-			if (text == null || text.Length > MaxLength) throw new FormatException("This is not an EldoUI addon list.");
+			if (text == null || text.Length > MaxBytes) throw new FormatException("This is not an EldoUI addon list.");
 			var o = Json.ParseObject(text);
 			if (o.Str("format") != Format || o.Num("version") != 1) throw new FormatException("This is not an EldoUI addon list.");
 			var choices = new List<AddonChoice>();
@@ -51,15 +51,21 @@ namespace EldoUI.Updater.Core
 			return choices;
 		}
 
-		/// <summary>Adds the choices to the player's selection. Nothing is removed and nothing is installed until the player says so.</summary>
-		public static void Apply(Settings settings, IEnumerable<AddonChoice> choices)
+		/// <summary>
+		/// Adds the choices to the player's selection and returns how many were new. Nothing is removed and nothing is
+		/// installed until the player says so.
+		/// </summary>
+		public static int Apply(Settings settings, IEnumerable<AddonChoice> choices)
 		{
+			int added = 0;
 			foreach (var c in choices)
 			{
+				if (!settings.ExtraAddons || !settings.SelectedCompanions.Contains(c.Id)) added++;
 				settings.SelectCompanion(c.Id, true);
 				if (c.PreRelease) settings.PreRelease.Add(c.Id); else settings.PreRelease.Remove(c.Id);
 				if (c.Held) settings.Held.Add(c.Id); else settings.Held.Remove(c.Id);
 			}
+			return added;
 		}
 	}
 }
