@@ -17,6 +17,8 @@ namespace EldoUI.Updater
 		public event Action<bool> InstallClicked;
 		public event Action<string> ImportChosen;
 		public event Action<string> ExportChosen;
+		/// <summary>The player resized the window or a column; the layout object holds the new sizes.</summary>
+		public event Action LayoutChanged;
 
 		readonly Font _head, _body, _small;
 		readonly Label _intro, _note, _message;
@@ -29,6 +31,9 @@ namespace EldoUI.Updater
 		AddonsView _view = new AddonsView();
 		bool _installedTab;
 		bool _rendering;
+		WindowLayout _layout = new WindowLayout();
+		int _sortColumn = -1;
+		bool _sortDescending;
 
 		public AddonsForm(Icon icon)
 		{
@@ -39,11 +44,9 @@ namespace EldoUI.Updater
 			AutoScaleDimensions = new SizeF(96f, 96f);
 			AutoScaleMode = AutoScaleMode.Dpi;
 			Icon = icon;
-			FormBorderStyle = FormBorderStyle.FixedSingle;
-			MaximizeBox = false;
-			MinimizeBox = false;
+			FormBorderStyle = FormBorderStyle.Sizable;
 			StartPosition = FormStartPosition.CenterScreen;
-			ClientSize = new Size(680, 620);
+			ClientSize = new Size(DefaultWidth, DefaultHeight);
 			BackColor = Theme.Panel;
 			ForeColor = Theme.Text;
 			Font = _body;
@@ -54,8 +57,8 @@ namespace EldoUI.Updater
 			Controls.Add(_intro);
 			_tabFind = new EButton { Location = new Point(22, 96), Size = new Size(150, 32) };
 			_tabInstalled = new EButton { Location = new Point(178, 96), Size = new Size(150, 32) };
-			_tabFind.Click += (s, e) => { _installedTab = false; Fill(); };
-			_tabInstalled.Click += (s, e) => { _installedTab = true; Fill(); };
+			_tabFind.Click += (s, e) => ShowInstalled(false);
+			_tabInstalled.Click += (s, e) => ShowInstalled(true);
 			Controls.Add(_tabFind);
 			Controls.Add(_tabInstalled);
 
@@ -71,6 +74,13 @@ namespace EldoUI.Updater
 			Controls.Add(_showHidden);
 
 			_list = new RowList { Location = new Point(22, 138), Size = new Size(636, 370) };
+			_list.ColumnsChanged += shares => { _layout.Columns[ListKey] = shares.ToList(); LayoutChanged?.Invoke(); };
+			_list.HeaderClicked += column =>
+			{
+				if (_sortColumn == column) _sortDescending = !_sortDescending;
+				else { _sortColumn = column; _sortDescending = false; }
+				Fill();
+			};
 			_list.Toggled += row => Raise(row.Checked == true ? AddonAction.Deselect : AddonAction.Select, row.Key);
 			_list.ButtonClicked += row => Choose(new MenuChoice { Action = row.Button.Value, Arg = row.Button == AddonAction.Add ? row.Key.Substring("suggest:".Length) : MenuArg(row, row.Button.Value) });
 			_list.MenuRequested += (row, at) => ShowMenu(row, at);
@@ -89,17 +99,79 @@ namespace EldoUI.Updater
 			_export.Click += (s, e) => Export();
 			_close.Click += (s, e) => Hide();
 			foreach (var b in new[] { _install, _recommended, _import, _export, _close }) Controls.Add(b);
-			_note = new Label { Location = new Point(40, 578), Size = new Size(600, 34), ForeColor = Theme.Muted, Font = _small, TextAlign = ContentAlignment.TopCenter };
+			_note = new Label { Location = new Point(22, 578), Size = new Size(636, 38), ForeColor = Theme.Muted, Font = _small, TextAlign = ContentAlignment.TopCenter };
 			Controls.Add(_note);
 			CancelButton = _close;
 			ResumeLayout(false);
 			ApplyTexts();
 		}
 
+		/// <summary>The window's inner size at first start, and the smallest it can be made, in logical pixels.</summary>
+		const int DefaultWidth = 920, DefaultHeight = 680, MinWidth = 720, MinHeight = 540;
+
+		int S(int v) { return (int)Math.Round(v * DeviceDpi / 96f); }
+
+		string ListKey { get { return _installedTab ? "installed" : "find"; } }
+
+		/// <summary>Uses the size and column widths the player left the window at (kept in the settings).</summary>
+		public void UseLayout(WindowLayout layout)
+		{
+			_layout = layout ?? new WindowLayout();
+			if (_layout.Width > 0 && _layout.Height > 0)
+			{
+				var area = Screen.FromControl(this).WorkingArea;
+				ClientSize = new Size(Math.Min(S(Math.Max(MinWidth, _layout.Width)), area.Width), Math.Min(S(Math.Max(MinHeight, _layout.Height)), area.Height));
+			}
+			Fill();
+		}
+
 		protected override void OnHandleCreated(EventArgs e)
 		{
 			base.OnHandleCreated(e);
 			Theme.DarkTitleBar(Handle);
+			MinimumSize = SizeFromClientSize(new Size(S(MinWidth), S(MinHeight)));
+		}
+
+		protected override void OnDpiChanged(DpiChangedEventArgs e)
+		{
+			base.OnDpiChanged(e);
+			MinimumSize = SizeFromClientSize(new Size(S(MinWidth), S(MinHeight)));
+		}
+
+		protected override void OnResizeEnd(EventArgs e)
+		{
+			base.OnResizeEnd(e);
+			if (WindowState != FormWindowState.Normal) return;
+			int w = (int)Math.Round(ClientSize.Width * 96f / DeviceDpi), h = (int)Math.Round(ClientSize.Height * 96f / DeviceDpi);
+			if (w == _layout.Width && h == _layout.Height) return;
+			_layout.Width = w;
+			_layout.Height = h;
+			LayoutChanged?.Invoke();
+		}
+
+		/// <summary>Places every part from the window's current size, so the list and its columns grow with it.</summary>
+		protected override void OnLayout(LayoutEventArgs e)
+		{
+			base.OnLayout(e);
+			if (_list == null) return;
+			int w = ClientSize.Width, h = ClientSize.Height, m = S(22);
+			_intro.SetBounds(m, S(50), w - 2 * m, S(40));
+			_tabFind.SetBounds(m, S(96), S(150), S(32));
+			_tabInstalled.SetBounds(m + S(156), S(96), S(150), S(32));
+			int categoryWidth = S(170), searchWidth = Math.Max(S(150), Math.Min(S(260), w - 2 * m - S(322) - categoryWidth - S(8)));
+			_category.SetBounds(w - m - categoryWidth, S(100), categoryWidth, S(26));
+			_search.SetBounds(_category.Left - S(8) - searchWidth, S(101), searchWidth, S(24));
+			_showHidden.SetBounds(m + S(322), S(100), w - 2 * m - S(322), S(26));
+			_list.SetBounds(m, S(138), w - 2 * m, Math.Max(S(120), h - S(138) - S(112)));
+			_message.SetBounds(m, h - S(106), w - 2 * m, S(20));
+			int y = h - S(82);
+			_install.SetBounds(m, y, S(170), S(34));
+			_recommended.SetBounds(m + S(176), y, S(170), S(34));
+			_import.SetBounds(m + S(352), y, S(96), S(34));
+			_export.SetBounds(m + S(454), y, S(96), S(34));
+			_close.SetBounds(w - m - S(80), y, S(80), S(34));
+			_note.SetBounds(m, h - S(42), w - 2 * m, S(38));
+			Invalidate();
 		}
 
 		protected override void OnFormClosing(FormClosingEventArgs e)
@@ -159,6 +231,7 @@ namespace EldoUI.Updater
 		/// <summary>Switches between the catalog and the installed addons.</summary>
 		public void ShowInstalled(bool installed)
 		{
+			if (_installedTab != installed) { _sortColumn = -1; _sortDescending = false; }
 			_installedTab = installed;
 			Fill();
 		}
@@ -193,6 +266,8 @@ namespace EldoUI.Updater
 				rows = AddonRows.Find(_view, _search.Text, category);
 				empty = T.S("addons.none");
 			}
+			if (_sortColumn >= 0) rows = AddonRows.Sort(rows, _sortColumn, _sortDescending);
+			_list.SetColumns(AddonRows.Headers(_installedTab), ColumnLayout.Shares(_layout, ListKey), _sortColumn, _sortDescending);
 			_list.SetRows(rows, empty, !_view.Busy);
 		}
 
@@ -271,21 +346,37 @@ namespace EldoUI.Updater
 		}
 	}
 
-	/// <summary>A scrolling list of addon rows, drawn in EldoUI's look: tick box, name, details, state and a menu button.</summary>
+	/// <summary>
+	/// A scrolling list of addon rows in EldoUI's look, with column headings. Drag the edge between two headings
+	/// to resize those columns; click a heading to sort. Names and descriptions wrap onto more lines instead of
+	/// being cut off, so every row is as tall as its text needs.
+	/// </summary>
 	sealed class RowList : Control
 	{
 		public event Action<AddonRow> Toggled, ButtonClicked;
 		public event Action<AddonRow, Point> MenuRequested;
+		public event Action<double[]> ColumnsChanged;
+		public event Action<int> HeaderClicked;
 
-		const int RowHeight = 62;
-		readonly VScrollBar _bar = new VScrollBar { Dock = DockStyle.Right };
+		const TextFormatFlags Wrap = TextFormatFlags.WordBreak | TextFormatFlags.NoPadding | TextFormatFlags.TextBoxControl;
+		const TextFormatFlags Line = TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding | TextFormatFlags.VerticalCenter;
+		readonly VScrollBar _bar = new VScrollBar();
 		readonly ToolTip _tips = new ToolTip();
-		readonly Font _name = Theme.Body(9.75f, FontStyle.Bold), _text = Theme.Body(8.75f), _button = Theme.Body(8.75f, FontStyle.Bold);
+		readonly Font _name = Theme.Body(9.75f, FontStyle.Bold), _text = Theme.Body(8.75f), _button = Theme.Body(8.75f, FontStyle.Bold), _header = Theme.Body(8.5f, FontStyle.Bold);
 		List<AddonRow> _rows = new List<AddonRow>();
+		List<int> _tops = new List<int>(), _heights = new List<int>();
+		string[] _headers = new string[0];
+		double[] _shares = new double[0];
+		int[] _widths = new int[0];
+		int _sortColumn = -1;
+		bool _sortDescending;
 		string _empty = "";
 		bool _enabled = true;
 		int _hover = -1;
 		string _tip;
+		int _dragEdge = -1, _dragStart;
+		double[] _dragShares;
+		bool _dragged;
 
 		public RowList()
 		{
@@ -297,54 +388,187 @@ namespace EldoUI.Updater
 
 		public IReadOnlyList<AddonRow> Rows { get { return _rows; } }
 
+		/// <summary>The column widths now, in pixels, for the self-test.</summary>
+		public IReadOnlyList<int> ColumnWidths { get { return _widths; } }
+
+		/// <summary>The height each row needs, in pixels, for the self-test.</summary>
+		public IReadOnlyList<int> RowHeights { get { return _heights; } }
+
+		public void SetColumns(string[] headers, double[] shares, int sortColumn, bool sortDescending)
+		{
+			_headers = headers ?? new string[0];
+			_shares = shares ?? new double[0];
+			_sortColumn = sortColumn;
+			_sortDescending = sortDescending;
+			Measure();
+		}
+
 		public void SetRows(List<AddonRow> rows, string empty, bool enabled)
 		{
 			_rows = rows ?? new List<AddonRow>();
 			_empty = empty ?? "";
 			_enabled = enabled;
-			int visible = Math.Max(1, Height / Scaled(RowHeight));
-			_bar.Maximum = Math.Max(0, _rows.Count - 1);
-			_bar.LargeChange = visible;
-			_bar.Enabled = _rows.Count > visible;
-			if (_bar.Value > Math.Max(0, _rows.Count - visible)) _bar.Value = Math.Max(0, _rows.Count - visible);
+			Measure();
+		}
+
+		int Scaled(int v) { return (int)Math.Round(v * DeviceDpi / 96f); }
+		int HeaderHeight { get { return Scaled(30); } }
+		bool HasBoxes { get { return _rows.Any(r => r.Checked != null); } }
+		int Gutter { get { return HasBoxes ? Scaled(40) : Scaled(12); } }
+		int ButtonSpace { get { return _rows.Any(r => r.Button != null) ? Scaled(118) : 0; } }
+		int MenuSpace { get { return _rows.Any(r => r.Menu.Count > 0) ? Scaled(46) : Scaled(8); } }
+		int ColumnsRight { get { return Width - _bar.Width - ButtonSpace - MenuSpace; } }
+
+		/// <summary>The left edge of each column, from the tick box gutter on.</summary>
+		int ColumnLeft(int column)
+		{
+			int x = Gutter;
+			for (int i = 0; i < column && i < _widths.Length; i++) x += _widths[i];
+			return x;
+		}
+
+		/// <summary>Works out column widths and the height of every row for the current width.</summary>
+		void Measure()
+		{
+			_bar.SetBounds(Width - SystemInformation.VerticalScrollBarWidth, HeaderHeight, SystemInformation.VerticalScrollBarWidth, Math.Max(0, Height - HeaderHeight));
+			_widths = ColumnLayout.Widths(_shares, Math.Max(0, ColumnsRight - Gutter), Scaled(ColumnLayout.MinWidth));
+			_tops = new List<int>();
+			_heights = new List<int>();
+			int y = 0, pad = Scaled(8), span = Math.Max(Scaled(40), ColumnsRight - Gutter - pad);
+			foreach (var row in _rows)
+			{
+				int line = Scaled(18);
+				for (int c = 0; c < _widths.Length; c++)
+				{
+					string text = Cell(row, c);
+					if (string.IsNullOrEmpty(text)) continue;
+					line = Math.Max(line, TextRenderer.MeasureText(text, c == 0 ? _name : _text, new Size(Math.Max(1, _widths[c] - pad), int.MaxValue), Wrap).Height);
+				}
+				int h = Scaled(10) + line;
+				if (!string.IsNullOrEmpty(row.Note)) h += Scaled(4) + TextRenderer.MeasureText(row.Note, _text, new Size(span, int.MaxValue), Wrap).Height;
+				if (!string.IsNullOrEmpty(row.Detail)) h += Scaled(4) + TextRenderer.MeasureText(row.Detail, _text, new Size(span, int.MaxValue), Wrap).Height;
+				h = Math.Max(Scaled(50), h + Scaled(10));
+				_tops.Add(y);
+				_heights.Add(h);
+				y += h;
+			}
+			int view = Math.Max(1, Height - HeaderHeight);
+			_bar.Minimum = 0;
+			_bar.Maximum = Math.Max(0, y - 1);
+			_bar.LargeChange = view;
+			_bar.SmallChange = Scaled(30);
+			_bar.Enabled = y > view;
+			if (_bar.Value > Math.Max(0, y - view)) _bar.Value = Math.Max(0, y - view);
 			Invalidate();
 		}
 
-		int Scaled(int v) { return (int)(v * DeviceDpi / 96f); }
+		static string Cell(AddonRow row, int column)
+		{
+			return column == 0 ? row.Title : column == 1 ? row.Kind : column == 2 ? row.Extra : row.Status;
+		}
+
+		protected override void OnResize(EventArgs e)
+		{
+			base.OnResize(e);
+			Measure();
+		}
+
+		protected override void OnDpiChangedAfterParent(EventArgs e)
+		{
+			base.OnDpiChangedAfterParent(e);
+			Measure();
+		}
 
 		int RowAt(Point p)
 		{
-			int i = _bar.Value + p.Y / Scaled(RowHeight);
-			return p.X < Width - _bar.Width && i >= 0 && i < _rows.Count ? i : -1;
+			if (p.Y < HeaderHeight || p.X >= Width - _bar.Width) return -1;
+			int y = p.Y - HeaderHeight + _bar.Value;
+			for (int i = 0; i < _rows.Count; i++)
+				if (y >= _tops[i] && y < _tops[i] + _heights[i]) return i;
+			return -1;
 		}
 
-		Rectangle RowRect(int i) { return new Rectangle(0, (i - _bar.Value) * Scaled(RowHeight), Width - _bar.Width, Scaled(RowHeight)); }
-		Rectangle BoxRect(Rectangle r) { return new Rectangle(r.Left + Scaled(12), r.Top + Scaled(12), Scaled(16), Scaled(16)); }
-		Rectangle MenuRect(Rectangle r) { return new Rectangle(r.Right - Scaled(40), r.Top + Scaled(16), Scaled(30), Scaled(30)); }
-		Rectangle ButtonRect(Rectangle r) { return new Rectangle(r.Right - Scaled(150), r.Top + Scaled(30), Scaled(104), Scaled(24)); }
+		/// <summary>The column edge under the pointer in the heading row (between column i and i + 1), or -1.</summary>
+		int EdgeAt(Point p)
+		{
+			if (p.Y >= HeaderHeight) return -1;
+			for (int i = 0; i < _widths.Length - 1; i++)
+				if (Math.Abs(p.X - ColumnLeft(i + 1)) <= Scaled(5)) return i;
+			return -1;
+		}
+
+		int HeaderAt(Point p)
+		{
+			if (p.Y >= HeaderHeight) return -1;
+			for (int i = 0; i < _widths.Length; i++)
+				if (p.X >= ColumnLeft(i) && p.X < ColumnLeft(i) + _widths[i]) return i;
+			return -1;
+		}
+
+		Rectangle RowRect(int i) { return new Rectangle(0, HeaderHeight + _tops[i] - _bar.Value, Width - _bar.Width, _heights[i]); }
+		Rectangle BoxRect(Rectangle r) { return new Rectangle(r.Left + Scaled(14), r.Top + Scaled(12), Scaled(16), Scaled(16)); }
+		Rectangle MenuRect(Rectangle r) { return new Rectangle(r.Right - Scaled(40), r.Top + Scaled(9), Scaled(30), Scaled(30)); }
+		Rectangle ButtonRect(Rectangle r) { return new Rectangle(ColumnsRight + Scaled(8), r.Top + Scaled(11), Scaled(106), Scaled(26)); }
 
 		protected override void OnMouseWheel(MouseEventArgs e)
 		{
-			if (_bar.Enabled) _bar.Value = Math.Max(0, Math.Min(_bar.Maximum - _bar.LargeChange + 1, _bar.Value - Math.Sign(e.Delta) * 2));
+			if (_bar.Enabled) _bar.Value = Math.Max(0, Math.Min(_bar.Maximum - _bar.LargeChange + 1, _bar.Value - Math.Sign(e.Delta) * Scaled(60)));
 			Invalidate();
 			base.OnMouseWheel(e);
 		}
 
+		protected override void OnMouseDown(MouseEventArgs e)
+		{
+			base.OnMouseDown(e);
+			int edge = EdgeAt(e.Location);
+			if (e.Button != MouseButtons.Left || edge < 0) return;
+			_dragEdge = edge;
+			_dragStart = e.X;
+			_dragShares = _shares;
+			_dragged = false;
+			Capture = true;
+		}
+
+		protected override void OnMouseUp(MouseEventArgs e)
+		{
+			base.OnMouseUp(e);
+			if (_dragEdge < 0) return;
+			_dragEdge = -1;
+			Capture = false;
+			if (_dragged) ColumnsChanged?.Invoke(_shares);
+		}
+
 		protected override void OnMouseMove(MouseEventArgs e)
 		{
+			if (_dragEdge >= 0)
+			{
+				_shares = ColumnLayout.Drag(_dragShares, _dragEdge, e.X - _dragStart, Math.Max(0, ColumnsRight - Gutter), Scaled(ColumnLayout.MinWidth));
+				_dragged = _dragged || e.X != _dragStart;
+				Measure();
+				base.OnMouseMove(e);
+				return;
+			}
+			Cursor = EdgeAt(e.Location) >= 0 ? Cursors.VSplit : HeaderAt(e.Location) >= 0 ? Cursors.Hand : Cursors.Default;
 			int i = RowAt(e.Location);
 			if (i != _hover) { _hover = i; Invalidate(); }
-			string tip = i >= 0 ? _rows[i].Tip : null;
+			string tip = e.Y < HeaderHeight ? T.S("addons.col.tip") : i >= 0 ? _rows[i].Tip : null;
 			if (tip != _tip) { _tip = tip; _tips.SetToolTip(this, tip ?? ""); }
 			base.OnMouseMove(e);
 		}
 
-		protected override void OnMouseLeave(EventArgs e) { _hover = -1; Invalidate(); base.OnMouseLeave(e); }
+		protected override void OnMouseLeave(EventArgs e) { _hover = -1; Cursor = Cursors.Default; Invalidate(); base.OnMouseLeave(e); }
 
 		protected override void OnMouseClick(MouseEventArgs e)
 		{
 			base.OnMouseClick(e);
 			Focus();
+			if (_dragged) { _dragged = false; return; }
+			if (e.Y < HeaderHeight)
+			{
+				int column = HeaderAt(e.Location);
+				if (e.Button == MouseButtons.Left && column >= 0 && EdgeAt(e.Location) < 0) HeaderClicked?.Invoke(column);
+				return;
+			}
 			int i = RowAt(e.Location);
 			if (i < 0) return;
 			var row = _rows[i];
@@ -352,13 +576,13 @@ namespace EldoUI.Updater
 			if (row.Menu.Count > 0 && (MenuRect(r).Contains(e.Location) || e.Button == MouseButtons.Right)) { MenuRequested?.Invoke(row, new Point(MenuRect(r).Left, MenuRect(r).Bottom)); return; }
 			if (!_enabled) return;
 			if (row.Button != null && ButtonRect(r).Contains(e.Location)) { ButtonClicked?.Invoke(row); return; }
-			if (row.Checked != null && e.X < r.Left + Scaled(260)) Toggled?.Invoke(row);
+			if (row.Checked != null && e.X < ColumnLeft(1)) Toggled?.Invoke(row);
 		}
 
 		protected override void OnKeyDown(KeyEventArgs e)
 		{
-			if (e.KeyCode == Keys.Down && _bar.Enabled) { _bar.Value = Math.Min(_bar.Maximum - _bar.LargeChange + 1, _bar.Value + 1); Invalidate(); }
-			if (e.KeyCode == Keys.Up && _bar.Value > 0) { _bar.Value--; Invalidate(); }
+			if (e.KeyCode == Keys.Down && _bar.Enabled) { _bar.Value = Math.Min(_bar.Maximum - _bar.LargeChange + 1, _bar.Value + _bar.SmallChange); Invalidate(); }
+			if (e.KeyCode == Keys.Up && _bar.Value > 0) { _bar.Value = Math.Max(0, _bar.Value - _bar.SmallChange); Invalidate(); }
 			base.OnKeyDown(e);
 		}
 
@@ -367,53 +591,44 @@ namespace EldoUI.Updater
 			var g = e.Graphics;
 			g.Clear(Theme.Bg);
 			g.SmoothingMode = SmoothingMode.AntiAlias;
-			using (var edge = new Pen(Theme.Edge))
-				g.DrawRectangle(edge, 0, 0, Width - _bar.Width - 1, Height - 1);
+			int head = HeaderHeight, pad = Scaled(8);
 			if (_rows.Count == 0)
-			{
-				TextRenderer.DrawText(g, _empty, _text, new Rectangle(0, 0, Width - _bar.Width, Scaled(80)), Theme.Muted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak);
-				return;
-			}
-			for (int i = _bar.Value; i < _rows.Count; i++)
+				TextRenderer.DrawText(g, _empty, _text, new Rectangle(0, head, Width - _bar.Width, Scaled(80)), Theme.Muted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak);
+			g.SetClip(new Rectangle(0, head, Width, Math.Max(0, Height - head)));
+			for (int i = 0; i < _rows.Count; i++)
 			{
 				var r = RowRect(i);
+				if (r.Bottom < head) continue;
 				if (r.Top > Height) break;
 				var row = _rows[i];
 				if (i == _hover)
 					using (var hover = new SolidBrush(Theme.Panel2)) g.FillRectangle(hover, r.Left + 1, r.Top, r.Width - 2, r.Height);
 				using (var line = new Pen(Theme.Edge)) g.DrawLine(line, r.Left + Scaled(10), r.Bottom - 1, r.Right - Scaled(10), r.Bottom - 1);
-				int x = r.Left + Scaled(12);
-				if (row.Checked != null)
+				if (row.Checked != null) DrawBox(g, BoxRect(r), row.Checked == true);
+				int y = r.Top + Scaled(10), line1 = Scaled(18);
+				for (int c = 0; c < _widths.Length; c++)
 				{
-					var box = BoxRect(r);
-					using (var path = Theme.Round(box, 3))
-					{
-						using (var fill = new SolidBrush(row.Checked == true ? Theme.AccentSoft : Theme.Panel)) g.FillPath(fill, path);
-						using (var pen = new Pen(row.Checked == true ? Theme.Accent : Theme.EdgeStrong, 1.2f)) g.DrawPath(pen, path);
-					}
-					if (row.Checked == true)
-						using (var pen = new Pen(Theme.Accent, 2f))
-							g.DrawLines(pen, new[] { new PointF(box.Left + box.Width * 0.22f, box.Top + box.Height * 0.52f), new PointF(box.Left + box.Width * 0.43f, box.Top + box.Height * 0.74f), new PointF(box.Left + box.Width * 0.8f, box.Top + box.Height * 0.28f) });
-					x = box.Right + Scaled(10);
+					string text = Cell(row, c);
+					if (string.IsNullOrEmpty(text)) continue;
+					var font = c == 0 ? _name : _text;
+					var size = new Size(Math.Max(1, _widths[c] - pad), int.MaxValue);
+					int h = TextRenderer.MeasureText(text, font, size, Wrap).Height;
+					line1 = Math.Max(line1, h);
+					Color color = c == 0 ? (row.Tone == Tone.Info && row.Checked == null ? Theme.Accent : Theme.Text) : c == 3 ? ToneColor(row.Tone) : Theme.Muted;
+					TextRenderer.DrawText(g, text, font, new Rectangle(ColumnLeft(c), y + (c == 0 ? 0 : Scaled(1)), size.Width, h), color, Wrap);
 				}
-				int right = r.Right - Scaled(row.Menu.Count > 0 ? 48 : 12);
-				var flags = TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding;
-				int nameWidth = Math.Min(TextRenderer.MeasureText(g, row.Title, _name, Size.Empty, flags).Width, right - x - Scaled(160));
-				TextRenderer.DrawText(g, row.Title, _name, new Rectangle(x, r.Top + Scaled(10), nameWidth, Scaled(18)), row.Tone == Tone.Info && row.Checked == null ? Theme.Accent : Theme.Text, flags);
-				if (!string.IsNullOrEmpty(row.Meta))
-					TextRenderer.DrawText(g, "  " + row.Meta, _text, new Rectangle(x + nameWidth, r.Top + Scaled(11), Math.Max(0, right - x - nameWidth - Scaled(150)), Scaled(18)), Theme.Muted, flags);
-				int detailWidth = right - x - (row.Button != null ? Scaled(150) : 0);
-				int noteWidth = 0;
+				y += line1;
+				int span = Math.Max(Scaled(40), ColumnsRight - Gutter - pad);
 				if (!string.IsNullOrEmpty(row.Note))
 				{
-					noteWidth = Math.Min(TextRenderer.MeasureText(g, row.Note, _text, Size.Empty, flags).Width + Scaled(10), detailWidth);
-					TextRenderer.DrawText(g, row.Note, _text, new Rectangle(x, r.Top + Scaled(32), noteWidth, Scaled(18)), Theme.Gold, flags);
+					int h = TextRenderer.MeasureText(row.Note, _text, new Size(span, int.MaxValue), Wrap).Height;
+					TextRenderer.DrawText(g, row.Note, _text, new Rectangle(Gutter, y + Scaled(4), span, h), Theme.Gold, Wrap);
+					y += Scaled(4) + h;
 				}
-				TextRenderer.DrawText(g, row.Detail ?? "", _text, new Rectangle(x + noteWidth, r.Top + Scaled(32), Math.Max(0, detailWidth - noteWidth), Scaled(18)), Theme.Muted, flags);
-				if (!string.IsNullOrEmpty(row.Status))
+				if (!string.IsNullOrEmpty(row.Detail))
 				{
-					Color tone = row.Tone == Tone.Ok ? Theme.Ok : row.Tone == Tone.Warn ? Theme.Warn : row.Tone == Tone.Error ? Theme.Err : row.Tone == Tone.Info ? Theme.Accent : Theme.Muted;
-					TextRenderer.DrawText(g, row.Status, _text, new Rectangle(right - Scaled(220), r.Top + Scaled(11), Scaled(214), Scaled(18)), tone, flags | TextFormatFlags.Right);
+					int h = TextRenderer.MeasureText(row.Detail, _text, new Size(span, int.MaxValue), Wrap).Height;
+					TextRenderer.DrawText(g, row.Detail, _text, new Rectangle(Gutter, y + Scaled(4), span, h), Theme.Muted, Wrap);
 				}
 				if (row.Button != null)
 				{
@@ -421,7 +636,7 @@ namespace EldoUI.Updater
 					using (var path = Theme.Round(b, 6))
 					using (var pen = new Pen(_enabled ? Theme.Accent : Theme.Edge))
 						g.DrawPath(pen, path);
-					TextRenderer.DrawText(g, row.ButtonText, _button, b, _enabled ? Theme.Accent : Theme.Muted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
+					TextRenderer.DrawText(g, row.ButtonText, _button, b, _enabled ? Theme.Accent : Theme.Muted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis);
 				}
 				if (row.Menu.Count > 0)
 				{
@@ -430,11 +645,51 @@ namespace EldoUI.Updater
 						for (int d = -1; d <= 1; d++) g.FillEllipse(dots, m.Left + m.Width / 2 - Scaled(2) + d * Scaled(7), m.Top + m.Height / 2 - Scaled(2), Scaled(4), Scaled(4));
 				}
 			}
+			g.ResetClip();
+			DrawHeader(g);
+			using (var edge = new Pen(Theme.Edge))
+				g.DrawRectangle(edge, 0, 0, Width - 1, Height - 1);
+		}
+
+		void DrawHeader(Graphics g)
+		{
+			int head = HeaderHeight;
+			using (var fill = new SolidBrush(Theme.Panel2)) g.FillRectangle(fill, 0, 0, Width, head);
+			using (var line = new Pen(Theme.EdgeStrong)) g.DrawLine(line, 0, head - 1, Width, head - 1);
+			for (int c = 0; c < _widths.Length && c < _headers.Length; c++)
+			{
+				int x = ColumnLeft(c);
+				string text = _headers[c] + (c == _sortColumn ? (_sortDescending ? "  ▼" : "  ▲") : "");
+				TextRenderer.DrawText(g, text, _header, new Rectangle(x, 0, Math.Max(1, _widths[c] - Scaled(10)), head), c == _sortColumn ? Theme.Text : Theme.Muted, Line);
+				if (c < _widths.Length - 1)
+				{
+					int edge = x + _widths[c];
+					using (var pen = new Pen(c == _dragEdge ? Theme.Accent : Theme.EdgeStrong, Math.Max(1f, Scaled(1))))
+						g.DrawLine(pen, edge, Scaled(7), edge, head - Scaled(7));
+				}
+			}
+		}
+
+		static Color ToneColor(Tone tone)
+		{
+			return tone == Tone.Ok ? Theme.Ok : tone == Tone.Warn ? Theme.Warn : tone == Tone.Error ? Theme.Err : tone == Tone.Info ? Theme.Accent : Theme.Muted;
+		}
+
+		static void DrawBox(Graphics g, Rectangle box, bool on)
+		{
+			using (var path = Theme.Round(box, 3))
+			{
+				using (var fill = new SolidBrush(on ? Theme.AccentSoft : Theme.Panel)) g.FillPath(fill, path);
+				using (var pen = new Pen(on ? Theme.Accent : Theme.EdgeStrong, 1.2f)) g.DrawPath(pen, path);
+			}
+			if (on)
+				using (var pen = new Pen(Theme.Accent, 2f))
+					g.DrawLines(pen, new[] { new PointF(box.Left + box.Width * 0.22f, box.Top + box.Height * 0.52f), new PointF(box.Left + box.Width * 0.43f, box.Top + box.Height * 0.74f), new PointF(box.Left + box.Width * 0.8f, box.Top + box.Height * 0.28f) });
 		}
 
 		protected override void Dispose(bool disposing)
 		{
-			if (disposing) { _tips.Dispose(); _name.Dispose(); _text.Dispose(); _button.Dispose(); }
+			if (disposing) { _tips.Dispose(); _name.Dispose(); _text.Dispose(); _button.Dispose(); _header.Dispose(); }
 			base.Dispose(disposing);
 		}
 	}

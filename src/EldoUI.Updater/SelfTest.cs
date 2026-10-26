@@ -105,6 +105,12 @@ namespace EldoUI.Updater
 					addonsForm.Render(AddonsView.Build(settings, null, AddonScanner.Scan(addOns, settings), true));
 					check(!install.Enabled && !recommended.Enabled, "nothing can be installed while a check runs");
 					check(actions.Count == 0, "rendering never changes a choice by itself");
+					check(addonsForm.FormBorderStyle == FormBorderStyle.Sizable && addonsForm.MinimumSize.Width > 0, "the Extra addons window can be resized, down to a readable minimum");
+					int nameWidth = list.ColumnWidths[0];
+					addonsForm.ClientSize = new Size(addonsForm.ClientSize.Width + 300, addonsForm.ClientSize.Height + 100);
+					Application.DoEvents();
+					check(list.ColumnWidths.Count == 4 && list.ColumnWidths[0] > nameWidth, "the columns grow with the window");
+					check(list.RowHeights.Count == list.Rows.Count && list.RowHeights.All(h => h > 0), "every row is as tall as its text needs");
 					addonsForm.Dispose();
 				}
 

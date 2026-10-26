@@ -75,6 +75,8 @@ namespace EldoUI.Updater
 			};
 			_addons.ImportChosen += ImportAddons;
 			_addons.ExportChosen += ExportAddons;
+			_addons.UseLayout(_settings.AddonsWindow);
+			_addons.LayoutChanged += Save;
 
 			_form.AppUpdateClicked += () => InstallApp();
 			_form.AppCheckClicked += CheckAppNow;

@@ -132,6 +132,9 @@ it and keep it up to date with EldoUI. **Install selected addons** installs the 
 **Install recommended** adds DBM, RestedXP and WeakAuras SharedMedia. Automatic installation follows
 **Install updates automatically**; when that is off, **Update now** applies what is waiting.
 
+The window can be resized. Drag the edge between two column headings to change a column's width, and click
+a heading to sort the list by it; the window keeps its size and column widths for next time.
+
 - **Installs only what it can check.** An addon is installed only from its author's GitHub release, only
   when the download has a published SHA-256 checksum, and only when it is made for WoW: Forever (a Forever
   file, release manifest or `.toc`). A download that holds programs or scripts, links, folders outside the

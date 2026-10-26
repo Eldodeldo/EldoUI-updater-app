@@ -40,6 +40,8 @@ namespace EldoUI.Updater.Core
 		/// <summary>A newer version of the updater itself, and when it was first seen (found while the app runs, it installs 24 hours later; found at start, at once).</summary>
 		public string UpdaterSeenVersion = "";
 		public DateTime? UpdaterSeenAt;
+		/// <summary>The Extra addons window's size and column widths, as the player left them.</summary>
+		public WindowLayout AddonsWindow = new WindowLayout();
 
 		public void SelectCompanion(string id, bool selected)
 		{
@@ -87,6 +89,7 @@ namespace EldoUI.Updater.Core
 				s.LastCheck = Time(o.Str("lastCheck"));
 				s.UpdaterSeenVersion = o.Str("updaterSeenVersion") ?? "";
 				s.UpdaterSeenAt = Time(o.Str("updaterSeenAt"));
+				s.AddonsWindow = WindowLayout.FromJson(o.Obj("addonsWindow"));
 			}
 			catch
 			{
@@ -118,6 +121,7 @@ namespace EldoUI.Updater.Core
 				{ "introduced", Introduced },
 				{ "updaterSeenVersion", UpdaterSeenVersion ?? "" },
 				{ "updaterSeenAt", Time(UpdaterSeenAt) },
+				{ "addonsWindow", (AddonsWindow ?? new WindowLayout()).ToJson() },
 			};
 			Directory.CreateDirectory(Path.GetDirectoryName(path));
 			string tmp = path + ".tmp";

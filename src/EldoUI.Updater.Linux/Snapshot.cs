@@ -68,6 +68,13 @@ namespace EldoUI.Updater
 					count += Save(addons, Path.Combine(dir, "linux-addons-find-" + lang + ".png"));
 					addons.ShowInstalled(true);
 					count += Save(addons, Path.Combine(dir, "linux-addons-installed-" + lang + ".png"));
+					foreach (var size in new[] { Tuple.Create("small", 720, 540), Tuple.Create("large", 1280, 820) })
+					{
+						addons.Width = size.Item2;
+						addons.Height = size.Item3;
+						addons.ShowInstalled(false);
+						count += Save(addons, Path.Combine(dir, "linux-addons-find-" + size.Item1 + "-" + lang + ".png"));
+					}
 					addons.AllowClose = true;
 					addons.Close();
 					foreach (var st in setups)
