@@ -2,6 +2,11 @@
 
 Each release of the EldoUI Updater. The newest is at the top.
 
+## [1.2.10] - 2026-10-26
+
+### Improved
+- In **Extra addons**, Bagnon now notes that EldoUI does part of its job: with BagBrother it shows item counts per character, which EldoUI's Alts window does too.
+
 ## [1.2.9] - 2026-10-26
 
 ### Improved
