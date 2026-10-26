@@ -2,6 +2,15 @@
 
 Each release of the EldoUI Updater. The newest is at the top.
 
+## [1.2.8] - 2026-10-26
+
+### Improved
+- The **Extra addons** window can be resized and maximized, and it opens at the size you left it. The list grows with the window.
+- The list has columns with headings: drag the edge between two headings to make a column wider, and click a heading to sort by it. The column widths are remembered.
+
+### Fixed
+- Addon names, notes and descriptions in **Extra addons** are shown in full; longer text wraps onto the next line instead of being cut off.
+
 ## [1.2.7] - 2026-10-26
 
 ### New

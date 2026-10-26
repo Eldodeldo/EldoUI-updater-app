@@ -66,6 +66,13 @@ namespace EldoUI.Updater
 						form.ShowInstalled(true);
 						Capture(form, Path.Combine(dir, "addons-installed-" + lang + ".png"));
 						count += 2;
+						form.ShowInstalled(false);
+						foreach (var size in new[] { Tuple.Create("small", 720, 540), Tuple.Create("large", 1280, 820) })
+						{
+							form.ClientSize = new Size(size.Item2 * form.DeviceDpi / 96, size.Item3 * form.DeviceDpi / 96);
+							Capture(form, Path.Combine(dir, "addons-find-" + size.Item1 + "-" + lang + ".png"));
+							count++;
+						}
 					}
 				}
 			}

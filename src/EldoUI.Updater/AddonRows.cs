@@ -23,7 +23,9 @@ namespace EldoUI.Updater
 
 	sealed class AddonRow
 	{
-		public string Key, Title, Meta, Detail, Status, Tip;
+		public string Key, Title, Detail, Status, Tip;
+		/// <summary>The second and third columns: category and source in the catalog, update state and version in Installed.</summary>
+		public string Kind, Extra;
 		/// <summary>"EldoUI already does this: Bags", for an addon an EldoUI module replaces; null otherwise.</summary>
 		public string Note;
 		public Tone Tone;
@@ -46,7 +48,8 @@ namespace EldoUI.Updater
 				{
 					Key = r.Id,
 					Title = r.Name,
-					Meta = Category(r.Entry.Category) + " · " + T.S(r.SourceKey),
+					Kind = Category(r.Entry.Category),
+					Extra = T.S(r.SourceKey),
 					Detail = r.Entry.Notice != null ? r.Entry.Description + " " + r.Entry.Notice : r.Entry.Description,
 					Status = StatusText(r),
 					Tone = ToneOf(r.StatusKey),
@@ -72,6 +75,60 @@ namespace EldoUI.Updater
 			if (r.InUse) row.Menu.Add(new MenuChoice { Text = T.S("addons.takeover"), Action = AddonAction.TakeOver, Arg = r.Id });
 		}
 
+		/// <summary>The column headings of the catalog list or the Installed list.</summary>
+		public static string[] Headers(bool installed)
+		{
+			return installed
+				? new[] { T.S("addons.col.name"), T.S("addons.col.updates"), T.S("addons.col.version"), T.S("addons.col.notes") }
+				: new[] { T.S("addons.col.name"), T.S("addons.col.category"), T.S("addons.col.source"), T.S("addons.col.status") };
+		}
+
+		/// <summary>The rows sorted by one column (0 name, 1 kind, 2 extra, 3 status); suggestions stay on top and empty cells go last.</summary>
+		public static List<AddonRow> Sort(List<AddonRow> rows, int column, bool descending)
+		{
+			Func<AddonRow, string> cell = column == 1 ? (Func<AddonRow, string>)(r => r.Kind) : column == 2 ? r => r.Extra : column == 3 ? r => r.Status : (Func<AddonRow, string>)(r => r.Title);
+			var top = rows.Where(r => r.Key.StartsWith("suggest:", StringComparison.Ordinal)).ToList();
+			var rest = rows.Where(r => !r.Key.StartsWith("suggest:", StringComparison.Ordinal)).ToList();
+			var filled = rest.Where(r => !string.IsNullOrEmpty(cell(r))).ToList();
+			var sorted = descending
+				? filled.OrderByDescending(cell, NaturalOrder.Instance).ThenBy(r => r.Title, NaturalOrder.Instance)
+				: filled.OrderBy(cell, NaturalOrder.Instance).ThenBy(r => r.Title, NaturalOrder.Instance);
+			return top.Concat(sorted).Concat(rest.Where(r => string.IsNullOrEmpty(cell(r)))).ToList();
+		}
+
+		/// <summary>Text order that ignores case and reads runs of digits as numbers, so 1.9 comes before 1.10.</summary>
+		sealed class NaturalOrder : IComparer<string>
+		{
+			public static readonly NaturalOrder Instance = new NaturalOrder();
+
+			public int Compare(string a, string b)
+			{
+				a = a ?? "";
+				b = b ?? "";
+				int i = 0, j = 0;
+				while (i < a.Length && j < b.Length)
+				{
+					if (char.IsDigit(a[i]) && char.IsDigit(b[j]))
+					{
+						int si = i, sj = j;
+						while (i < a.Length && char.IsDigit(a[i])) i++;
+						while (j < b.Length && char.IsDigit(b[j])) j++;
+						string na = a.Substring(si, i - si).TrimStart('0'), nb = b.Substring(sj, j - sj).TrimStart('0');
+						int c = na.Length != nb.Length ? na.Length.CompareTo(nb.Length) : string.CompareOrdinal(na, nb);
+						if (c != 0) return c;
+					}
+					else
+					{
+						int c = string.Compare(a[i].ToString(), b[j].ToString(), StringComparison.CurrentCultureIgnoreCase);
+						if (c != 0) return c;
+						i++;
+						j++;
+					}
+				}
+				return (a.Length - i).CompareTo(b.Length - j);
+			}
+		}
+
 		public static List<AddonRow> Installed(AddonsView view, bool showHidden)
 		{
 			var rows = new List<AddonRow>();
@@ -93,8 +150,8 @@ namespace EldoUI.Updater
 				{
 					Key = string.Join("/", a.Folders),
 					Title = a.State == AddonState.GuideData ? T.S("addons.state.guidedata") : a.Name,
-					Meta = (a.State == AddonState.Managed && entry != null && view.Catalog.Any(c => c.Id == entry.Id && c.Held) ? T.S("extra.Held") : T.S("addons.state." + a.State.ToString().ToLowerInvariant()))
-						+ (string.IsNullOrEmpty(a.Version) ? "" : " · " + a.Version),
+					Kind = a.State == AddonState.Managed && entry != null && view.Catalog.Any(c => c.Id == entry.Id && c.Held) ? T.S("extra.Held") : T.S("addons.state." + a.State.ToString().ToLowerInvariant()),
+					Extra = a.Version ?? "",
 					Detail = string.Join(", ", a.Folders),
 					Note = Covered(entry),
 					Tone = a.State == AddonState.Managed || a.State == AddonState.EldoUI || a.State == AddonState.GuideData ? Tone.Ok : Tone.Plain,
