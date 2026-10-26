@@ -29,7 +29,7 @@ namespace EldoUI.Updater.Core
 		public bool? Forever;
 		/// <summary>The companion definition from earlier versions (DBM, RestedXP, SharedMedia), or null.</summary>
 		public Companion Legacy;
-		/// <summary>The EldoUI modules that replace this addon one to one (CoverageData); empty when none.</summary>
+		/// <summary>The EldoUI modules that do this addon's job in full or in part, or work with it (CoverageData); empty when none.</summary>
 		public List<CoveringModule> CoveredBy = new List<CoveringModule>();
 
 		public AddonSource Source
@@ -76,10 +76,11 @@ namespace EldoUI.Updater.Core
 		Companion _package;
 	}
 
-	/// <summary>An EldoUI module that does an addon's whole job, with its name in English and Danish.</summary>
+	/// <summary>An EldoUI module that does an addon's job, with its name in English and Danish.</summary>
 	public sealed class CoveringModule
 	{
-		public string Module, English, Danish;
+		/// <summary>"full" when the module does the addon's whole job, "part" when it does some of it, "works" when it works with the addon.</summary>
+		public string Module, Scope, English, Danish;
 	}
 
 	public static class AddonCatalog
@@ -117,7 +118,7 @@ namespace EldoUI.Updater.Core
 		/// <summary>The EldoUI version the coverage notes were made from.</summary>
 		public static string CoverageVersion { get { return Json.ParseObject(CoverageData.Json).Str("eldoui"); } }
 
-		/// <summary>Adds which EldoUI modules replace each addon. Ids the catalog does not know are left out.</summary>
+		/// <summary>Adds which EldoUI modules do each addon's job or work with it. Ids the catalog does not know are left out.</summary>
 		public static List<CatalogEntry> WithCoverage(List<CatalogEntry> list, string json)
 		{
 			var addons = Json.ParseObject(json).Obj("addons") ?? new Dictionary<string, object>();
@@ -129,7 +130,9 @@ namespace EldoUI.Updater.Core
 				{
 					string en = m.Str("en");
 					if (string.IsNullOrEmpty(en)) continue;
-					e.CoveredBy.Add(new CoveringModule { Module = m.Str("module"), English = en, Danish = m.Str("da") ?? en });
+					string scope = m.Str("scope");
+					if (scope != "part" && scope != "works") scope = "full";
+					e.CoveredBy.Add(new CoveringModule { Module = m.Str("module"), Scope = scope, English = en, Danish = m.Str("da") ?? en });
 				}
 			}
 			return list;

@@ -933,7 +933,7 @@ namespace EldoUI.Updater.Core
 		{
 			""id"": ""loot-pro"",
 			""name"": ""LootPro"",
-			""desc"": ""Loot roll helper built for Forever."",
+			""desc"": ""Replaces the scrolling combat and loot text with two feeds, with item alerts and gray selling."",
 			""category"": ""Loot"",
 			""github"": ""wheelbarrel00/LootPro"",
 			""curse"": 1510306,
@@ -1117,8 +1117,8 @@ namespace EldoUI.Updater.Core
 		{
 			""id"": ""voidbox"",
 			""name"": ""VoidBox"",
-			""desc"": ""Void storage helper."",
-			""category"": ""Bags"",
+			""desc"": ""Small party and raid frames with click-casting."",
+			""category"": ""Unit frames"",
 			""github"": ""VoiD911/VoidBox"",
 			""curse"": 1459481,
 			""folders"": [

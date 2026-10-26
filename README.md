@@ -114,8 +114,8 @@ bash packaging/linux/build-appimage.sh publish
 `src/Core` holds everything without UI (GitHub answers, versions, checksums, zip checks and install, WoW
 folders, Wine prefixes, settings, the addon catalog, sources and scan) and is what the tests cover, with the
 engine of WoW Linux setup (`src/EldoUI.Updater.Linux/Lightforge.cs`). The catalog is rebuilt with
-`tools/build_catalog.py`, and the notes on addons EldoUI already covers with `tools/build_coverage.py`
-from the source of each EldoUI release. Both apps take `--selftest` and
+`tools/build_catalog.py`, and the notes on what EldoUI does for each addon with `tools/build_coverage.py`
+from the source of each EldoUI release and the reviewed answers in `tools/coverage-review.json`. Both apps take `--selftest` and
 `--snapshot <folder>`.
 
 To release, raise `<Version>` in `src/Directory.Build.props`, add its section at the top of `CHANGELOG.md`
@@ -142,10 +142,12 @@ a heading to sort the list by it; the window keeps its size and column widths fo
 - **WoWInterface and TukUI** publish no checksum, so their addons are never installed by the updater. When
   you add one, the updater checks it for new versions and links to its page.
 - **Addons that only have a page** (CurseForge, for example) show a link to that page.
-- **EldoUI already does this.** An addon that an EldoUI module replaces one to one has a gold note naming
-  that module (in the catalog and in the Installed list), so you can skip it or turn the module off if you
-  prefer the addon. The notes follow EldoUI's own list of addons that do a module's job and are updated with
-  each EldoUI release.
+- **What EldoUI already does.** A gold note (in the catalog and in the Installed list) names the EldoUI
+  modules that matter for an addon: "EldoUI already does this" when a module does the addon's whole job,
+  "EldoUI does part of this" when a module covers some of it, and "Works with EldoUI" when EldoUI is made
+  to work alongside it. You can skip an addon EldoUI already covers, or turn the module off if you prefer
+  the addon. Every catalog addon is checked against EldoUI, and the notes are updated with each EldoUI
+  release.
 - **Your own copy stays yours.** If an addon is already in AddOns, put there by hand, the updater says so
   and does nothing until you click **Update it** and confirm. Files you added to its folders are kept.
 - **Choices per addon** (the **⋯** button): keep it at your version, take pre-releases, open its page, or

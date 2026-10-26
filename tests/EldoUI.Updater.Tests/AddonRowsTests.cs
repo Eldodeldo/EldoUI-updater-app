@@ -133,10 +133,36 @@ namespace EldoUI.Updater.Tests
 			Assert.False(string.IsNullOrEmpty(AddonCatalog.CoverageVersion));
 			Assert.Equal(new[] { "Nameplates" }, AddonCatalog.Find("plater").CoveredBy.Select(m => m.Module));
 			Assert.True(AddonCatalog.Find("elvui").CoveredBy.Count > 3);
-			Assert.Empty(AddonCatalog.Find("dbm").CoveredBy);
+			Assert.Empty(AddonCatalog.Find("texture-atlas-viewer").CoveredBy);
 			Assert.All(AddonCatalog.All.SelectMany(e => e.CoveredBy), m => Assert.False(string.IsNullOrEmpty(m.English) || string.IsNullOrEmpty(m.Danish)));
-			Assert.Null(AddonRows.Covered(AddonCatalog.Find("dbm")));
+			Assert.All(AddonCatalog.All.SelectMany(e => e.CoveredBy), m => Assert.Contains(m.Scope, new[] { "full", "part", "works" }));
+			Assert.Null(AddonRows.Covered(AddonCatalog.Find("texture-atlas-viewer")));
+		}
 
+		[Fact]
+		public void EachAddonNamesAModuleOnlyOnce()
+		{
+			foreach (var e in AddonCatalog.All)
+				Assert.Equal(e.CoveredBy.Count, e.CoveredBy.Select(m => m.Module).Distinct().Count());
+		}
+
+		[Fact]
+		public void TheNoteSaysHowMuchEldoUIDoes()
+		{
+			Assert.All(AddonCatalog.Find("plater").CoveredBy, m => Assert.Equal("full", m.Scope));
+			Assert.Contains(AddonCatalog.Find("all-the-things").CoveredBy, m => m.Module == "Appearances" && m.Scope == "part");
+			Assert.DoesNotContain(AddonCatalog.Find("all-the-things").CoveredBy, m => m.Scope == "full");
+			Assert.All(AddonCatalog.Find("dbm").CoveredBy, m => Assert.Equal("works", m.Scope));
+			Assert.NotEmpty(AddonCatalog.Find("dbm").CoveredBy);
+		}
+
+		[Fact]
+		public void ScopesReadFromTheListAndDefaultToFull()
+		{
+			var list = new List<CatalogEntry> { new CatalogEntry { Id = "a" }, new CatalogEntry { Id = "b" } };
+			AddonCatalog.WithCoverage(list, "{\"addons\":{\"a\":[{\"module\":\"X\",\"en\":\"X\"},{\"module\":\"Y\",\"scope\":\"part\",\"en\":\"Y\"},{\"module\":\"Z\",\"scope\":\"odd\",\"en\":\"Z\"}],\"b\":[{\"module\":\"W\",\"scope\":\"works\",\"en\":\"W\"}]}}");
+			Assert.Equal(new[] { "full", "part", "full" }, list[0].CoveredBy.Select(m => m.Scope));
+			Assert.Equal("works", list[1].CoveredBy.Single().Scope);
 		}
 
 		[Fact]
@@ -153,7 +179,7 @@ namespace EldoUI.Updater.Tests
 			{
 				var view = AddonRows.Sample(t.Sub("AddOns"));
 				Assert.NotNull(AddonRows.Find(view, "", null).Single(r => r.Key == "plater").Note);
-				Assert.Null(AddonRows.Find(view, "", null).Single(r => r.Key == "dbm").Note);
+				Assert.Null(AddonRows.Find(view, "", null).Single(r => r.Key == "texture-atlas-viewer").Note);
 				Assert.Contains(AddonRows.Installed(view, false), r => r.Note != null);
 			}
 		}

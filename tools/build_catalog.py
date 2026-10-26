@@ -8,7 +8,7 @@ those publishers only, and installs only what has a published SHA-256 checksum.
 What this script changes from the upstream file:
 - Wago fields are dropped, and an entry that is only on Wago is left out.
 - RestedXP takes the id the updater already uses ("rxp"), so saved choices keep working.
-- A few descriptions, notices and links are rewritten so they describe the addon, not another app.
+- A few descriptions, categories, notices and links are rewritten so they describe the addon correctly.
 - Bundles, featured spots and download statistics are not used.
 Moving the pinned commit forward is done through an issue, with the diff of the catalog reviewed.
 """
@@ -30,7 +30,11 @@ DESC = {
 	"questie": "Quest helper. Its Forever version is not released yet.",
 	"details": "Damage meter.",
 	"elvui": "Full UI replacement. TukUI has no Forever build of it yet; the updater shows when one is listed.",
+	"voidbox": "Small party and raid frames with click-casting.",
+	"loot-pro": "Replaces the scrolling combat and loot text with two feeds, with item alerts and gray selling.",
 }
+# Categories that match what the addon does.
+CATEGORY = {"voidbox": "Unit frames"}
 # Pages that replace the upstream link: Details! keeps the CurseForge page the updater has always opened for it.
 URL = {"details": "https://www.curseforge.com/wow/addons/details"}
 NOTICE = {
@@ -60,6 +64,8 @@ def main():
 		e["id"] = ID_MAP.get(a["id"], a["id"])
 		if a["id"] in DESC:
 			e["desc"] = DESC[a["id"]]
+		if a["id"] in CATEGORY:
+			e["category"] = CATEGORY[a["id"]]
 		if a["id"] in NOTICE:
 			e["notice"] = NOTICE[a["id"]]
 		if a["id"] in URL:
