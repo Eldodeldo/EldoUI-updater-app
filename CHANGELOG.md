@@ -2,6 +2,14 @@
 
 Each release of the EldoUI Updater. The newest is at the top.
 
+## [1.2.9] - 2026-10-26
+
+### Improved
+- The notes in **Extra addons** now say how much EldoUI does for each addon: "EldoUI already does this" when an EldoUI module does the addon's whole job, "EldoUI does part of this" when a module covers some of it, and "Works with EldoUI" for addons EldoUI is made to work alongside. Every addon in the catalog was checked against EldoUI, so far more addons carry a note than before.
+
+### Fixed
+- VoidBox and LootPro have descriptions that match what they do, and VoidBox is listed under Unit frames.
+
 ## [1.2.8] - 2026-10-26
 
 ### Improved

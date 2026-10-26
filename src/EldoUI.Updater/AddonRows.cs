@@ -182,13 +182,22 @@ namespace EldoUI.Updater
 			return rows;
 		}
 
-		/// <summary>The note for an addon EldoUI's own modules replace, in the player's language; null when none does.</summary>
+		/// <summary>
+		/// The note for an addon EldoUI's own modules cover, in the player's language: one line each for the modules
+		/// that do its whole job, the ones that do part of it and the ones that work with it; null when there are none.
+		/// </summary>
 		public static string Covered(CatalogEntry entry)
 		{
 			if (entry == null || entry.CoveredBy.Count == 0) return null;
-			var names = entry.CoveredBy.Select(m => T.Lang == "da" ? m.Danish : m.English).ToList();
-			string list = names.Count <= 3 ? string.Join(", ", names) : string.Join(", ", names.Take(3)) + " " + T.F("addons.covered.more", names.Count - 3);
-			return T.F("addons.covered", list);
+			var lines = new List<string>();
+			foreach (var scope in new[] { "full", "part", "works" })
+			{
+				var names = entry.CoveredBy.Where(m => m.Scope == scope).Select(m => T.Lang == "da" ? m.Danish : m.English).ToList();
+				if (names.Count == 0) continue;
+				string list = names.Count <= 3 ? string.Join(", ", names) : string.Join(", ", names.Take(3)) + " " + T.F("addons.covered.more", names.Count - 3);
+				lines.Add(T.F(scope == "full" ? "addons.covered" : "addons.covered." + scope, list));
+			}
+			return string.Join("\n", lines);
 		}
 
 		public static int HiddenCount(AddonsView view) { return view.Installed.Count(a => a.Ignored); }
