@@ -52,7 +52,8 @@ off), start with Windows or at login (on or off), language (English or Danish), 
 
 ## How it updates
 
-- It checks when it starts and every three hours after that.
+- It checks when it starts and every 10 minutes after that, so a new EldoUI is in your AddOns folder
+  minutes after its release. Checks that find nothing new do not count against GitHub's limits.
 - It asks GitHub for the newest EldoUI release and downloads `EldoUI-<version>.zip` from github.com.
 - The download must match the SHA-256 checksum published with the release (GitHub's own checksum for the
   file, or a `SHA256SUMS.txt` / `<file>.sha256` in the release). Without a checksum, or when the file does

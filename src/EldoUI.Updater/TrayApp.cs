@@ -15,7 +15,10 @@ namespace EldoUI.Updater
 {
 	sealed class TrayApp : ApplicationContext
 	{
-		static readonly TimeSpan CheckEvery = TimeSpan.FromHours(3);
+		// A new EldoUI is found within minutes. Unchanged answers from GitHub do not count against its limit.
+		static readonly TimeSpan CheckEvery = TimeSpan.FromMinutes(10);
+		// When GitHub cannot be reached, the wait between tries grows up to this.
+		static readonly TimeSpan SlowRetry = TimeSpan.FromHours(3);
 		const string SiteUrl = "https://github.com/Eldodeldo/EldoUI";
 		const string ReleasesUrl = "https://github.com/Eldodeldo/EldoUI/releases/latest";
 
@@ -272,7 +275,7 @@ namespace EldoUI.Updater
 			else if (r.Outcome == CheckOutcome.Offline || r.Outcome == CheckOutcome.Failed)
 			{
 				_retryAt = DateTime.UtcNow + _backoff;
-				_backoff = TimeSpan.FromTicks(Math.Min(_backoff.Ticks * 2, CheckEvery.Ticks));
+				_backoff = TimeSpan.FromTicks(Math.Min(_backoff.Ticks * 2, SlowRetry.Ticks));
 			}
 			else
 			{
@@ -503,7 +506,7 @@ namespace EldoUI.Updater
 				Log.Write("Updater self-update failed: " + ex.Message);
 				try { File.Delete(target); } catch { }
 				// Try again at the next check, not every minute.
-				_appAt = DateTime.UtcNow + CheckEvery;
+				_appAt = DateTime.UtcNow + SlowRetry;
 				_appBusy = false;
 				UpdateView(_last);
 			}

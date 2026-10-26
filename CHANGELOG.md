@@ -2,7 +2,10 @@
 
 Each release of the EldoUI Updater. The newest is at the top.
 
-## [Unreleased]
+## [1.2.7] - 2026-10-26
+
+### Improved
+- A new EldoUI is installed within minutes of its release: the updater now looks for one every 10 minutes instead of every three hours. When GitHub cannot be reached, it still waits longer between tries.
 
 ### Fixed
 - Keep addon downloads matched to the selected release and leave the installed addon unchanged if the zip contains another version.

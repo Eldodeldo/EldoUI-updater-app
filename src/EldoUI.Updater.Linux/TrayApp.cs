@@ -1,6 +1,6 @@
 // The updater as it lives in the panel on Linux: the tray icon (StatusNotifierItem), its menu, the timer
 // that checks for a new EldoUI, the app's own quiet self-update, and the window. The same behaviour as
-// the Windows TrayApp: checks every 3 hours, installs by itself, never a pop-up for the app's own update.
+// the Windows TrayApp: checks every 10 minutes, installs by itself, never a pop-up for the app's own update.
 using System;
 using System.Linq;
 using System.Diagnostics;
@@ -16,7 +16,10 @@ namespace EldoUI.Updater
 {
 	sealed class TrayApp
 	{
-		static readonly TimeSpan CheckEvery = TimeSpan.FromHours(3);
+		// A new EldoUI is found within minutes. Unchanged answers from GitHub do not count against its limit.
+		static readonly TimeSpan CheckEvery = TimeSpan.FromMinutes(10);
+		// When GitHub cannot be reached, the wait between tries grows up to this.
+		static readonly TimeSpan SlowRetry = TimeSpan.FromHours(3);
 		const string SiteUrl = "https://github.com/Eldodeldo/EldoUI";
 		const string ReleasesUrl = "https://github.com/Eldodeldo/EldoUI/releases/latest";
 
@@ -266,7 +269,7 @@ namespace EldoUI.Updater
 			else if (r.Outcome == CheckOutcome.Offline || r.Outcome == CheckOutcome.Failed)
 			{
 				_retryAt = DateTime.UtcNow + _backoff;
-				_backoff = TimeSpan.FromTicks(Math.Min(_backoff.Ticks * 2, CheckEvery.Ticks));
+				_backoff = TimeSpan.FromTicks(Math.Min(_backoff.Ticks * 2, SlowRetry.Ticks));
 			}
 			else
 			{
@@ -495,7 +498,7 @@ namespace EldoUI.Updater
 				Log.Write("Updater self-update failed: " + ex.Message);
 				try { File.Delete(target); } catch { }
 				// Try again at the next check, not every minute.
-				_appAt = DateTime.UtcNow + CheckEvery;
+				_appAt = DateTime.UtcNow + SlowRetry;
 				_appBusy = false;
 				UpdateView(_last);
 			}
