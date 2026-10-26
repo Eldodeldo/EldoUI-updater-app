@@ -39,6 +39,8 @@ namespace EldoUI.Updater
 		// A newer updater: shown in the window and menu, installed by itself when _appAt has passed.
 		Release _app;
 		DateTime _appAt;
+		// After a failed self-update, the next automatic try waits until this, whatever the checks in between find.
+		DateTime _appRetryAt;
 		bool _appBusy;
 		bool _appChecking;
 		// After a failed check: wait 15 minutes, then twice as long each time, at most the normal interval.
@@ -417,6 +419,7 @@ namespace EldoUI.Updater
 			bool first = _app == null || _app.Version != r.Version;
 			_app = r;
 			_appAt = SelfUpdatePolicy.Note(_settings, r.Version, DateTime.UtcNow);
+			if (_appRetryAt > _appAt) _appAt = _appRetryAt;
 			Save();
 			if (booting) Log.Write("Updater " + r.Version + " is out; installing it now, at start");
 			else if (first) Log.Write("Updater " + r.Version + " is out; it installs itself at " + _appAt.ToLocalTime().ToString("g"));
@@ -498,7 +501,8 @@ namespace EldoUI.Updater
 				Log.Write("Updater self-update failed: " + ex.Message);
 				try { File.Delete(target); } catch { }
 				// Try again at the next check, not every minute.
-				_appAt = DateTime.UtcNow + SlowRetry;
+				_appRetryAt = DateTime.UtcNow + SlowRetry;
+				_appAt = _appRetryAt;
 				_appBusy = false;
 				UpdateView(_last);
 			}
