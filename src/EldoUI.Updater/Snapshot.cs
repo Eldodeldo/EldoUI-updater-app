@@ -6,6 +6,7 @@ using System.IO;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using EldoUI.Updater.Core;
 
 namespace EldoUI.Updater
 {
@@ -42,34 +43,7 @@ namespace EldoUI.Updater
 					{
 						form.Show();
 						form.Render(v);
-						Application.DoEvents();
-						using (var bmp = new Bitmap(form.Width, form.Height))
-						{
-							// Capture the native non-client frame too; DrawToBitmap uses a different caption.
-							using (var graphics = Graphics.FromImage(bmp))
-							{
-								var target = graphics.GetHdc();
-								try
-								{
-									if (!PrintWindow(form.Handle, target, 2)) throw new Win32Exception();
-								}
-								finally { graphics.ReleaseHdc(target); }
-							}
-							// Each control again on top, so runtimes that leave them out of the form's picture still show them.
-							var client = form.PointToScreen(Point.Empty);
-							int dx = client.X - form.Left, dy = client.Y - form.Top;
-							foreach (Control c in form.Controls)
-							{
-								if (!c.Visible) continue;
-								using (var part = new Bitmap(c.Width, c.Height))
-								using (var g = Graphics.FromImage(bmp))
-								{
-									c.DrawToBitmap(part, new Rectangle(Point.Empty, c.Size));
-									g.DrawImageUnscaled(part, c.Left + dx, c.Top + dy);
-								}
-							}
-							bmp.Save(Path.Combine(dir, "window-" + st.Item1 + "-" + lang + ".png"), ImageFormat.Png);
-						}
+						Capture(form, Path.Combine(dir, "window-" + st.Item1 + "-" + lang + ".png"));
 						form.AllowClose = true;
 						form.Close();
 					}
@@ -77,8 +51,62 @@ namespace EldoUI.Updater
 					count++;
 				}
 			}
+			string sample = Path.Combine(Path.GetTempPath(), "eldoui-updater-snapshot-" + Guid.NewGuid().ToString("N").Substring(0, 8), "AddOns");
+			try
+			{
+				foreach (string lang in new[] { "en", "da" })
+				{
+					T.Use(lang);
+					var view = AddonRows.Sample(sample);
+					using (var form = new AddonsForm(Assets.Icon(false)) { StartPosition = FormStartPosition.Manual, Location = new Point(-3000, -3000), ShowInTaskbar = false })
+					{
+						form.Show();
+						form.Render(view);
+						Capture(form, Path.Combine(dir, "addons-find-" + lang + ".png"));
+						form.ShowInstalled(true);
+						Capture(form, Path.Combine(dir, "addons-installed-" + lang + ".png"));
+						count += 2;
+					}
+				}
+			}
+			finally
+			{
+				try { Directory.Delete(Path.GetDirectoryName(sample), true); } catch { }
+			}
 			Console.WriteLine(count + " pictures in " + Path.GetFullPath(dir));
 			return count > 0 ? 0 : 1;
+		}
+
+		static void Capture(Form form, string path)
+		{
+			Application.DoEvents();
+			using (var bmp = new Bitmap(form.Width, form.Height))
+			{
+				// Capture the native non-client frame too; DrawToBitmap uses a different caption.
+				using (var graphics = Graphics.FromImage(bmp))
+				{
+					var target = graphics.GetHdc();
+					try
+					{
+						if (!PrintWindow(form.Handle, target, 2)) throw new Win32Exception();
+					}
+					finally { graphics.ReleaseHdc(target); }
+				}
+				// Each control again on top, so runtimes that leave them out of the form's picture still show them.
+				var client = form.PointToScreen(Point.Empty);
+				int dx = client.X - form.Left, dy = client.Y - form.Top;
+				foreach (Control c in form.Controls)
+				{
+					if (!c.Visible) continue;
+					using (var part = new Bitmap(c.Width, c.Height))
+					using (var g = Graphics.FromImage(bmp))
+					{
+						c.DrawToBitmap(part, new Rectangle(Point.Empty, c.Size));
+						g.DrawImageUnscaled(part, c.Left + dx, c.Top + dy);
+					}
+				}
+				bmp.Save(path, ImageFormat.Png);
+			}
 		}
 	}
 }

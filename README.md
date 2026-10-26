@@ -4,7 +4,8 @@
 
 A small tray app for Windows and Linux that keeps [EldoUI](https://github.com/Eldodeldo/EldoUI) up to date
 for **WoW: Forever**. When a new EldoUI is released, it installs it in your AddOns folder by itself. Your
-EldoUI settings stay as they are.
+EldoUI settings stay as they are. It can also keep other addons you choose up to date (**Extra addons**),
+and on Linux it helps you install the game itself (**WoW Linux setup**).
 
 - **Download:** [latest release](https://github.com/Eldodeldo/EldoUI-updater-app/releases/latest):
   `EldoUI-Updater.exe` for Windows, `EldoUI-Updater-x86_64.AppImage` for Linux.
@@ -41,14 +42,17 @@ On GNOME, the tray icon needs the *AppIndicator and KStatusNotifierItem Support*
 Without a tray the window opens instead. If the AppImage mentions FUSE, install your distribution's `fuse3`
 package.
 
+No WoW on Linux yet? See [WoW Linux setup](#wow-linux-setup) below.
+
 The **This app** row also has a **Check update** button. It shows **Checking…** during a request
 and becomes **Update now** when a newer updater is ready.
 
 ## The menu
 
 Right-click the troll icon: check for updates now, check for an app update (it always tells you what it
-found), what's new, choose the WoW folder, open the AddOns folder, install updates automatically (on or
-off), start with Windows or at login (on or off), language (English or Danish), EldoUI on GitHub, and exit.
+found), what's new, choose the WoW folder, open the AddOns folder, WoW Linux setup (Linux only),
+install updates automatically (on or off), start with Windows or at login (on or off), language (English or
+Danish), EldoUI on GitHub, and exit.
 
 ## How it updates
 
@@ -59,19 +63,27 @@ off), start with Windows or at login (on or off), language (English or Danish), 
   not match, nothing is installed and the window says so.
 - The zip may only hold EldoUI folders (`EldoUI`, `EldoUI_<Name>`), each with its own `.toc`. They are
   unpacked next to AddOns first and then swapped in; if anything fails, the old folders are put back.
-- It manages only EldoUI's own folders: the ones in the zip and the ones it installed before. Companion addons are managed only after you enable the optional setting below. Other addons and the game's `WTF` folder (your settings) are never touched.
+- It manages only EldoUI's own folders: the ones in the zip and the ones it installed before. Other addons
+  are managed only after you choose them in **Extra addons** (below). The game's `WTF` folder (your
+  settings) is never touched.
 - The updater updates itself from this repository's releases, with the same checksum rule.
 
 ## Privacy and safety
 
 - **Sends:** only `GET` requests to GitHub's public API (`api.github.com`) and release downloads from
-  `github.com`. No account, no token, no telemetry, nothing about you or your PC.
+  `github.com`. For an addon you add from WoWInterface or TukUI, it also asks that site's public version
+  API (`api.mmoui.com`, `api.tukui.org`) for that addon only. No account, no token, no telemetry, nothing
+  about you or your PC.
 - **Reads:** where your games are (Battle.net's settings and installed-games list, the registry on
-  Windows, Wine prefixes on Linux), the `.toc` of the installed EldoUI to know its version, and explicitly enabled companion folders to preserve their existing files during updates.
-- **Opens:** pages on `github.com` and the exact Details! CurseForge project page for manual installation. Other external pages are refused.
+  Windows, Wine prefixes on Linux), the `.toc` files in AddOns (to show what is installed and what it
+  needs), and on Linux, when you open WoW Linux setup, your distribution, glibc version, fonts and free
+  space.
+- **Opens:** pages on `github.com` and the addon publishers' own pages (CurseForge, WoWInterface, TukUI)
+  for addons in the catalog. Other external pages are refused.
 - **First start:** a short notice says what the updater does and how to turn its automatic parts off.
-- **Writes:** EldoUI's folders and explicitly enabled companion folders in AddOns, and its own files (on Linux, the installed AppImage is runnable
-  only by your user):
+- **Writes:** EldoUI's folders and the folders of addons you chose in AddOns, and its own files (on Linux,
+  the installed AppImage is runnable only by your user). WoW Linux setup writes Lightforge's
+  files only when you click its install button (see below).
 
 | What | Windows | Linux |
 | --- | --- | --- |
@@ -100,7 +112,10 @@ bash packaging/linux/build-appimage.sh publish
 ```
 
 `src/Core` holds everything without UI (GitHub answers, versions, checksums, zip checks and install, WoW
-folders, Wine prefixes, settings) and is what the tests cover. Both apps take `--selftest` and
+folders, Wine prefixes, settings, the addon catalog, sources and scan) and is what the tests cover, with the
+engine of WoW Linux setup (`src/EldoUI.Updater.Linux/Lightforge.cs`). The catalog is rebuilt with
+`tools/build_catalog.py`, and the notes on addons EldoUI already covers with `tools/build_coverage.py`
+from the source of each EldoUI release. Both apps take `--selftest` and
 `--snapshot <folder>`.
 
 To release, raise `<Version>` in `src/Directory.Build.props`, add its section at the top of `CHANGELOG.md`
@@ -109,32 +124,68 @@ and merge. The build workflow publishes `v<version>` with both files and `SHA256
 Bug reports and ideas: [Issues](https://github.com/Eldodeldo/EldoUI-updater-app/issues). For EldoUI itself,
 use the [EldoUI issues](https://github.com/Eldodeldo/EldoUI/issues).
 
+## Extra addons
+
+Click **Extra addons…** in the updater window. **Find addons** lists the catalog: about a hundred addons
+for WoW: Forever, each with the place its author publishes it. Tick an addon to have the updater install
+it and keep it up to date with EldoUI. **Install selected addons** installs the ticked ones now;
+**Install recommended** adds DBM, RestedXP and WeakAuras SharedMedia. Automatic installation follows
+**Install updates automatically**; when that is off, **Update now** applies what is waiting.
+
+- **Installs only what it can check.** An addon is installed only from its author's GitHub release, only
+  when the download has a published SHA-256 checksum, and only when it is made for WoW: Forever (a Forever
+  file, release manifest or `.toc`). A download that holds programs or scripts, links, folders outside the
+  addon, or folders another addon already uses is refused before anything changes.
+- **WoWInterface and TukUI** publish no checksum, so their addons are never installed by the updater. When
+  you add one, the updater checks it for new versions and links to its page.
+- **Addons that only have a page** (CurseForge, for example) show a link to that page.
+- **EldoUI already does this.** An addon that an EldoUI module replaces one to one has a gold note naming
+  that module (in the catalog and in the Installed list), so you can skip it or turn the module off if you
+  prefer the addon. The notes follow EldoUI's own list of addons that do a module's job and are updated with
+  each EldoUI release.
+- **Your own copy stays yours.** If an addon is already in AddOns, put there by hand, the updater says so
+  and does nothing until you click **Update it** and confirm. Files you added to its folders are kept.
+- **Choices per addon** (the **⋯** button): keep it at your version, take pre-releases, open its page, or
+  stop updating it (it stays installed).
+- **Installed** shows everything in your AddOns folder grouped by addon: EldoUI, the Eldostar guide data,
+  addons the updater keeps up to date, and the rest. It shows addons not made for Forever and missing
+  dependencies, and offers a catalog addon that another addon needs. Hide rows you do not want to see.
+- **Import and Export** save your choices to a small file (`eldoui-addons.json`) with catalog names only,
+  to move them to another PC.
+- Updates keep files you added, install into a staging folder first and put the old folders back if
+  anything fails; a backup that cannot be put back is kept, not deleted.
+
+## WoW Linux setup
+
+On Linux, **WoW Linux setup…** (window or tray menu) helps you install Battle.net and WoW: Forever with
+[Lightforge](https://github.com/LightforgeProject/lightforge), a free, separate program by its own authors
+(GPL-3.0-or-later).
+
+1. The assistant checks your system: distribution, x86_64, glibc 2.36 or newer, fonts, 32-bit support and
+   free space. Anything missing is shown with what to do; installing system packages is up to you.
+2. **Install Lightforge** downloads Lightforge 1.0.0-beta.7 from its GitHub release, checks it against the
+   SHA-256 in the release's checksum list (and the value built into the updater), and puts `lightforge`,
+   `lightforge-gui`, its app menu entry and icons in `~/.local/bin` and `~/.local/share`, the same places
+   Lightforge's own installer uses. Nothing is piped into a shell, no password is asked for, and a failed
+   install leaves the earlier files in place.
+3. **Open Lightforge** opens its own window, where you set up Proton, Battle.net and the game. The assistant
+   never starts Battle.net or the game.
+4. The assistant shows what Lightforge reports, with read-only commands only. When WoW: Forever is
+   installed there, **Use its WoW: Forever** points the updater at it.
+
+Lightforge connects to Blizzard's servers, its project's own servers (`tuxcore.pro`: artwork, its catalog
+and a download proxy), GitHub (Proton downloads) and, when you use its addon features, CurseForge,
+WoWInterface and TukUI. The updater sends nothing to these. A newer Lightforge version comes with an update
+of the updater; until then the assistant reads only the version it knows.
+
 ## License and credits
 
 Apache License 2.0 (see `LICENSE` and `NOTICE`). Made by Eldodeldo, as an AI-made project like EldoUI.
 
+The addon catalog is adapted from [AddonForge](https://github.com/Topher121/AddonForge) (MIT License,
+Copyright (c) 2026 Pocket Forge Studios; full notice in `NOTICE`). [Lightforge](https://github.com/LightforgeProject/lightforge)
+is a separate program (GPL-3.0-or-later) that WoW Linux setup downloads unchanged; it is not part
+of the updater.
+
 EldoUI is not made by or affiliated with Blizzard Entertainment. World of Warcraft is a trademark of
 Blizzard Entertainment, Inc.
-
-## Optional companion addons (1.2.4)
-
-Open **Extra addons…** in the updater window and check **DBM**, **RestedXP** or
-**WeakAuras SharedMedia** individually. Use **Install selected addons**, or **Install all EldoUI recommended**
-to select and install all three at once. They are not managed until you choose them. Automatic installation follows
-**Install updates automatically**; when that is off, **Update now** applies available updates.
-Point at the companion option for each addon's result and failure details. Removing a checkmark stops managing that addon and leaves it installed.
-
-Packages come directly from the publishers' GitHub releases. Both the compatibility manifest and
-package need published SHA-256 checksums, and the manifest must explicitly list the Forever flavor.
-Each package has a separate folder boundary, version and managed-file inventory. Updates preserve
-files outside the publisher's package inventory, including user-added guide files; only files previously
-managed by this updater are removed when the next package drops them. Failed placement restores the
-old folders; a failed restoration retains its backup instead of deleting it. Symlinked addon trees
-are refused. No game WTF data is changed and no third-party files are bundled or republished.
-
-The menu also links to the Details! CurseForge project page. Details! is intentionally not managed: install and update it separately with the CurseForge app.
-There is no CurseForge API integration, account requirement or API key.
-
-Upstream sources: [DBM](https://github.com/DeadlyBossMods/DeadlyBossMods/releases),
-[RestedXP](https://github.com/RestedXP/RXPGuides/releases),
-[SharedMedia](https://github.com/WeakAuras/WeakAuras_SharedMedia/releases).

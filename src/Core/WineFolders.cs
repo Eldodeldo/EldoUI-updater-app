@@ -1,5 +1,5 @@
 // Finding WoW: Forever on Linux, where the game runs in a Wine prefix: plain Wine, Lutris, Bottles,
-// Steam (Proton) or winetricks. Each prefix is a small Windows: drive_c is C:, and dosdevices links the
+// Steam (Proton), winetricks or Lightforge. Each prefix is a small Windows: drive_c is C:, and dosdevices links the
 // other drive letters. Battle.net inside the prefix keeps its own install list with Windows paths,
 // which are turned into Linux paths here. Nothing here touches Windows-only APIs.
 using System;
@@ -12,6 +12,9 @@ namespace EldoUI.Updater.Core
 {
 	public static class WineFolders
 	{
+		/// <summary>Lightforge's default game library, below the home folder.</summary>
+		public const string LightforgeLibrary = "Games/Blizzard/games/World of Warcraft";
+
 		/// <summary>Where WoW usually lands inside a prefix's C: drive.</summary>
 		static readonly string[] CommonInPrefix =
 		{
@@ -201,6 +204,8 @@ namespace EldoUI.Updater.Core
 		{
 			var dirs = new List<string>();
 			foreach (string prefix in Prefixes(home, winePrefixEnv)) dirs.AddRange(InstallDirs(prefix));
+			// Lightforge keeps the game outside its prefix, in its default library.
+			dirs.Add(Path.Combine(home, LightforgeLibrary));
 			return WowFolders.Find(dirs);
 		}
 	}

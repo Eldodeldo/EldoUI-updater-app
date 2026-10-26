@@ -22,6 +22,8 @@ namespace EldoUI.Updater.Core
 		public string PageUrl;
 		public DateTime? Published;
 		public string Notes;
+		/// <summary>The publisher marked it as a test release (only read when pre-releases are asked for).</summary>
+		public bool PreRelease;
 		public List<ReleaseAsset> Assets = new List<ReleaseAsset>();
 
 		/// <summary>Reads GitHub's "get the latest release" answer. Drafts and pre-releases are refused.</summary>
@@ -33,23 +35,33 @@ namespace EldoUI.Updater.Core
 		/// <summary>Reads GitHub's "list releases" answer: the published, non-test releases, newest first as GitHub sends them.</summary>
 		public static List<Release> ListFromGitHub(string json)
 		{
+			return ListFromGitHub(json, false);
+		}
+
+		/// <summary>
+		/// As ListFromGitHub; with includePreReleases, test releases are listed too, and so are releases whose tag is
+		/// not a version number (addon publishers tag in many ways). Drafts never.
+		/// </summary>
+		public static List<Release> ListFromGitHub(string json, bool includePreReleases)
+		{
 			var list = Json.Parse(json) as List<object>;
 			if (list == null) throw new FormatException("Expected a JSON list of releases.");
 			var result = new List<Release>();
 			foreach (var item in list)
 			{
 				var o = item as Dictionary<string, object>;
-				var r = o == null ? null : FromObject(o);
-				if (r != null && r.Version != null) result.Add(r);
+				var r = o == null ? null : FromObject(o, includePreReleases);
+				if (r != null && (r.Version != null || (includePreReleases && !string.IsNullOrEmpty(r.Tag)))) result.Add(r);
 			}
 			return result;
 		}
 
-		static Release FromObject(Dictionary<string, object> o)
+		static Release FromObject(Dictionary<string, object> o, bool includePreReleases = false)
 		{
-			if (o.Bool("draft") || o.Bool("prerelease")) return null;
+			if (o.Bool("draft") || (o.Bool("prerelease") && !includePreReleases)) return null;
 			var r = new Release
 			{
+				PreRelease = o.Bool("prerelease"),
 				Tag = o.Str("tag_name"),
 				Name = o.Str("name"),
 				PageUrl = o.Str("html_url"),
@@ -91,9 +103,13 @@ namespace EldoUI.Updater.Core
 		}
 
 		public const string DetailsPage = "https://www.curseforge.com/wow/addons/details";
+		// An addon's own page at its publisher, as the catalog builds it from the addon's id.
+		static readonly Regex PublisherPage = new Regex(@"\Ahttps://(?:www\.curseforge\.com/wow/addons/[a-z0-9-]{1,80}|www\.wowinterface\.com/downloads/info[0-9]{1,9}|tukui\.org/[a-z0-9-]{1,64})\z", RegexOptions.CultureInvariant);
+
+		/// <summary>The pages the app opens in the browser: pages on github.com, and an addon's own page on CurseForge, WoWInterface or TukUI.</summary>
 		public static bool IsAllowedPage(string url)
 		{
-			return IsGitHubPage(url) || string.Equals(url, DetailsPage, StringComparison.Ordinal);
+			return IsGitHubPage(url) || string.Equals(url, DetailsPage, StringComparison.Ordinal) || (url != null && PublisherPage.IsMatch(url));
 		}
 
 		/// <summary>The only pages the app opens in the browser: HTTPS pages on github.com.</summary>

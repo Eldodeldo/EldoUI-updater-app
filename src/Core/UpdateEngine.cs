@@ -72,6 +72,14 @@ namespace EldoUI.Updater.Core
 			return Release.FromGitHub(body);
 		}
 
+		/// <summary>The newest release of a repository; with includePreReleases a test release counts too. Null when there is none.</summary>
+		public async Task<Release> NewestAsync(string repo, bool includePreReleases, CancellationToken ct)
+		{
+			if (!includePreReleases) return await LatestAsync(repo, ct).ConfigureAwait(false);
+			string body = await _web.GetApiAsync(_apiBase + "/repos/" + repo + "/releases?per_page=10", ct).ConfigureAwait(false);
+			return Release.ListFromGitHub(body, true).FirstOrDefault();
+		}
+
 		/// <summary>Looks for a new EldoUI and installs it when install is true (or settings say so).</summary>
 		public async Task<CheckResult> CheckAsync(Settings settings, bool forceInstall, CancellationToken ct, bool installCompanions = false)
 		{

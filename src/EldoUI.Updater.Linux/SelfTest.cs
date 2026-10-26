@@ -1,5 +1,6 @@
 // --selftest: the Linux parts in a temp folder, without the network: finding WoW in Wine, Lutris, Bottles
-// and Steam prefixes, installing EldoUI into it, settings, and the embedded icon. CI runs it on Linux.
+// and Steam prefixes, installing EldoUI into it, settings, the Extra addons rows, the setup assistant's
+// system check, and the embedded icon. CI runs it on Linux.
 using System;
 using System.IO;
 using System.IO.Compression;
@@ -50,6 +51,15 @@ namespace EldoUI.Updater
 				string settingsPath = Path.Combine(home, "settings.json");
 				s.Save(settingsPath);
 				Check(Settings.Load(settingsPath).AddOnsDir == addOns, "settings are saved and read back");
+				var view = AddonRows.Sample(Path.Combine(home, "sample", "AddOns"));
+				Check(AddonRows.Find(view, "", null).Count >= AddonCatalog.All.Count && AddonRows.Installed(view, false).Count > 0, "the Extra addons window has its catalog and the installed addons");
+
+				var system = LightforgeChecks.Evaluate(SystemInfo.Read(home));
+				var glibc = system.Find(c => c.Key == "lf.check.glibc");
+				Check(system.Count == 6 && glibc != null && !string.IsNullOrEmpty(glibc.Found), "the setup assistant reads this system (glibc " + (glibc != null ? glibc.Found : "?") + ")");
+				var plan = LightforgePlan.For(home, null);
+				Check(plan.Cli == Path.Combine(home, ".local", "bin", "lightforge") && plan.Desktop.StartsWith(Path.Combine(home, ".local", "share", "applications")), "Lightforge's files go only into the home folder");
+
 				using (var logo = Assets.Open("logo.png")) Check(logo.Length > 1000, "the icon is in the program");
 				Check(!string.IsNullOrEmpty(Setup.Version), "the version is " + Setup.Version);
 			}

@@ -70,7 +70,7 @@ namespace EldoUI.Updater.Tests
 			{
 				var settings = new Settings { ExtraAddons = true, AddOnsDir = t.Sub("AddOns") };
 				var results = await new CompanionUpdater(Serve(t, wrongFlavor, corrupt), t.Sub("temp")).CheckAsync(settings, true, CancellationToken.None);
-				Assert.Equal(CompanionOutcome.Failed, results[0].Outcome);
+				Assert.Equal(wrongFlavor ? CompanionOutcome.NoForever : CompanionOutcome.Failed, results[0].Outcome);
 				Assert.Equal(2, results.Count(r => r.Outcome == CompanionOutcome.Installed));
 				Assert.False(Directory.Exists(Path.Combine(settings.AddOnsDir, "DBM-Core")));
 				Assert.False(settings.ExtraVersions.ContainsKey("dbm"));
