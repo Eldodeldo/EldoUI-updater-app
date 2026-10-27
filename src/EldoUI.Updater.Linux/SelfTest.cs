@@ -1,6 +1,6 @@
 // --selftest: the Linux parts in a temp folder, without the network: finding WoW in Wine, Lutris, Bottles
 // and Steam prefixes, installing EldoUI into it, settings, the Extra addons rows, the setup assistant's
-// system check, and the embedded icon. CI runs it on Linux.
+// system check, the updater's own requirement check, and the embedded icon. CI runs it on Linux.
 using System;
 using System.IO;
 using System.IO.Compression;
@@ -59,6 +59,11 @@ namespace EldoUI.Updater
 				Check(system.Count == 6 && glibc != null && !string.IsNullOrEmpty(glibc.Found), "the setup assistant reads this system (glibc " + (glibc != null ? glibc.Found : "?") + ")");
 				var plan = LightforgePlan.For(home, null);
 				Check(plan.Cli == Path.Combine(home, ".local", "bin", "lightforge") && plan.Desktop.StartsWith(Path.Combine(home, ".local", "share", "applications")), "Lightforge's files go only into the home folder");
+
+				var probe = Requirements.Read();
+				Check(Requirements.Report(probe, Setup.Version).Length > 0, "the requirement check reads this system (" + (probe.Name ?? "unknown") + ")");
+				Check(Requirements.DesktopExec("/home/x/a b.AppImage", "--tray", true) == "env APPIMAGE_EXTRACT_AND_RUN=1 \"/home/x/a b.AppImage\" --tray",
+					"without FUSE the app menu and login entries start the updater unpacked");
 
 				using (var logo = Assets.Open("logo.png")) Check(logo.Length > 1000, "the icon is in the program");
 				Check(!string.IsNullOrEmpty(Setup.Version), "the version is " + Setup.Version);

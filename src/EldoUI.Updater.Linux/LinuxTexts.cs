@@ -75,6 +75,21 @@ namespace EldoUI.Updater
 				{ "lf.failed", "Lightforge was not installed: {0} What was there before is unchanged." },
 				{ "lf.used", "The updater now uses {0}." },
 				{ "linux.notray", "The tray icon needs a panel with StatusNotifier support (on GNOME: the AppIndicator extension). The updater keeps working without it; open it from the app menu." },
+				{ "req.and", " and " },
+				{ "req.system", "System: {0} · EldoUI Updater {1}" },
+				{ "req.ready", "Everything the updater needs is here." },
+				{ "req.blocked", "EldoUI Updater cannot start on this system yet. Nothing was installed or changed. Start it again when this is fixed:" },
+				{ "req.title", "EldoUI Updater cannot start" },
+				{ "req.display", "No graphical session was found. Start the updater from your desktop." },
+				{ "req.wayland", "This Wayland session has no XWayland, which the updater's window needs. Turn XWayland on, or log in to an X11 session." },
+				{ "req.fontconfig", "The fontconfig library is missing. {0}" },
+				{ "req.x11", "The X11 libraries are missing. {0}" },
+				{ "req.fuse", "FUSE is not available, so the updater unpacks itself each time it starts: a few seconds slower, and it works just as well. {0}" },
+				{ "req.cmd", "Install with: {0}" },
+				{ "req.pkg", "Install your distribution's {0} package." },
+				{ "req.tested", "{0} is one of the distributions this version was tested on." },
+				{ "req.untested", "This distribution is not one of those this version was tested on ({0}). The updater is made for any 64-bit Linux desktop with the parts checked here." },
+				{ "error.start", "EldoUI Updater could not open its window: {0} The log has the details: {1}" },
 			};
 		}
 
@@ -142,6 +157,21 @@ namespace EldoUI.Updater
 				{ "lf.failed", "Lightforge blev ikke installeret: {0} Det, der var der før, er uændret." },
 				{ "lf.used", "Updateren bruger nu {0}." },
 				{ "linux.notray", "Bakke-ikonet kræver et panel med StatusNotifier (på GNOME: udvidelsen AppIndicator). Updateren virker også uden; åbn den fra programmenuen." },
+				{ "req.and", " og " },
+				{ "req.system", "System: {0} · EldoUI Updater {1}" },
+				{ "req.ready", "Alt, hvad updateren har brug for, er her." },
+				{ "req.blocked", "EldoUI Updater kan ikke starte på dette system endnu. Intet er installeret eller ændret. Start den igen, når dette er ordnet:" },
+				{ "req.title", "EldoUI Updater kan ikke starte" },
+				{ "req.display", "Der blev ikke fundet en grafisk session. Start updateren fra dit skrivebord." },
+				{ "req.wayland", "Denne Wayland-session har ikke XWayland, som updaterens vindue skal bruge. Slå XWayland til, eller log ind i en X11-session." },
+				{ "req.fontconfig", "Biblioteket fontconfig mangler. {0}" },
+				{ "req.x11", "X11-bibliotekerne mangler. {0}" },
+				{ "req.fuse", "FUSE er ikke tilgængelig, så updateren pakker sig selv ud, hver gang den starter: et par sekunder langsommere, og den virker lige så godt. {0}" },
+				{ "req.cmd", "Installér med: {0}" },
+				{ "req.pkg", "Installér din distributions pakke {0}." },
+				{ "req.tested", "{0} er en af de distributioner, denne version er testet på." },
+				{ "req.untested", "Denne distribution er ikke blandt dem, denne version er testet på ({0}). Updateren er lavet til ethvert 64-bit Linux-skrivebord med de dele, der tjekkes her." },
+				{ "error.start", "EldoUI Updater kunne ikke åbne sit vindue: {0} Loggen har detaljerne: {1}" },
 			};
 		}
 

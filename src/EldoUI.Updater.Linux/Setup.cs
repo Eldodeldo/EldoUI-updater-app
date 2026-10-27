@@ -95,11 +95,20 @@ namespace EldoUI.Updater
 			catch (Exception ex) { Log.Write("Icon not written: " + ex.Message); }
 		}
 
+		/// <summary>
+		/// True when this AppImage cannot mount itself (no FUSE) or was started unpacked. The app menu and login entries
+		/// then start it the same way, so they work on that system too.
+		/// </summary>
+		public static bool Unpacked
+		{
+			get { return Environment.GetEnvironmentVariable("APPIMAGE_EXTRACT_AND_RUN") == "1" || !Requirements.FuseUsable(); }
+		}
+
 		static void WriteDesktop(string path, string args)
 		{
 			Directory.CreateDirectory(Path.GetDirectoryName(path));
-			string exec = "\"" + InstalledApp.Replace("\"", "\\\"") + "\"" + (args.Length > 0 ? " " + args : "");
-			File.WriteAllText(path, string.Join("\n", new[]
+			string exec = Requirements.DesktopExec(InstalledApp, args, Unpacked);
+			string text = string.Join("\n", new[]
 			{
 				"[Desktop Entry]",
 				"Type=Application",
@@ -112,7 +121,37 @@ namespace EldoUI.Updater
 				"StartupNotify=false",
 				"X-GNOME-Autostart-enabled=true",
 				"",
-			}));
+			});
+			// Written only when it changed, so a start that changes nothing leaves the file alone.
+			if (!File.Exists(path) || File.ReadAllText(path) != text) File.WriteAllText(path, text);
+		}
+
+		/// <summary>
+		/// Brings the app menu and login entries in line with how this copy starts (with or without FUSE), for an
+		/// install made before the entries knew about it, or a system that gained or lost FUSE since.
+		/// </summary>
+		public static void RefreshEntries()
+		{
+			try
+			{
+				if (File.Exists(MenuEntry)) WriteDesktop(MenuEntry, "");
+				if (File.Exists(AutostartEntry)) WriteDesktop(AutostartEntry, "--tray");
+			}
+			catch (Exception ex) { Log.Write("App menu entries not refreshed: " + ex.Message); }
+		}
+
+		/// <summary>A desktop notice through notify-send, when the desktop has it; otherwise only the log and the terminal say it.</summary>
+		public static void Notice(string title, string body)
+		{
+			try
+			{
+				var psi = new ProcessStartInfo("notify-send") { UseShellExecute = false };
+				psi.ArgumentList.Add("--app-name=EldoUI Updater");
+				psi.ArgumentList.Add(title);
+				psi.ArgumentList.Add(body ?? "");
+				Process.Start(psi);
+			}
+			catch (Exception ex) { Log.Write("No desktop notice (" + ex.Message + "): " + title); }
 		}
 
 		public static bool Autostart
