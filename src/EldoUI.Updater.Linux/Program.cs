@@ -4,6 +4,7 @@
 //   --tray          start hidden in the tray (autostart uses this)
 //   --updated       started by a self-update (forgets the version it was waiting for)
 //   --uninstall     remove the updater (EldoUI stays in the game)
+//   --check-system  say whether this system has what the updater needs, and whether it was tested on it
 //   --selftest      check the Linux search and settings in a temp folder and exit (CI)
 //   --snapshot DIR  save pictures of the window in both languages and exit (CI)
 using System;
@@ -39,6 +40,21 @@ namespace EldoUI.Updater
 				int i = Array.FindIndex(args, a => string.Equals(a, "--snapshot", StringComparison.OrdinalIgnoreCase));
 				return Snapshot.Run(i + 1 < args.Length ? args[i + 1] : "snapshots");
 			}
+			if (Has("--check-system"))
+			{
+				var system = Requirements.Read();
+				Console.WriteLine(Requirements.Report(system, Setup.Version));
+				// What WoW Linux setup checks before it installs Lightforge, with the same fixes it shows.
+				Console.WriteLine();
+				Console.WriteLine(T.S("lf.title") + ":");
+				foreach (var c in LightforgeChecks.Evaluate(SystemInfo.Read(Setup.Home)))
+				{
+					string state = c.State == CheckState.Ok ? "ok  " : c.State == CheckState.Warn ? "note" : "FAIL";
+					Console.WriteLine("  " + state + "  " + T.S(c.Key) + ": " + (c.Found ?? (c.State == CheckState.Ok ? T.S("lf.found.yes") : T.S("lf.found.none"))));
+					if (c.State != CheckState.Ok) Console.WriteLine("        " + (c.Fix ?? T.S("lf.fix." + c.Key.Substring("lf.check.".Length) + (c.Key == "lf.check.glibc" ? (c.State == CheckState.Warn ? ".warn" : ".fail") : ""))));
+				}
+				return Requirements.CanRun(system) ? 0 : 1;
+			}
 			if (Has("--uninstall"))
 			{
 				Instance.Send("exit");
@@ -48,8 +64,20 @@ namespace EldoUI.Updater
 				return 0;
 			}
 
+			// Nothing is installed on a system the window cannot open on; the player is told what to add instead.
+			var sys = Requirements.Read();
+			if (!Requirements.CanRun(sys))
+			{
+				string report = Requirements.Report(sys, Setup.Version);
+				Log.Write("Cannot start: " + report.Replace(Environment.NewLine, " | "));
+				Console.Error.WriteLine(report);
+				Setup.Notice(T.S("req.title"), report);
+				return 1;
+			}
+
 			// A downloaded AppImage installs itself and starts the installed copy.
 			if (Setup.IsAppImage && !Setup.RunningInstalled) return InstallAndStart();
+			if (Setup.RunningInstalled) Setup.RefreshEntries();
 
 			using (var instance = Instance.TryOwn())
 			{
@@ -59,8 +87,20 @@ namespace EldoUI.Updater
 					Instance.Send("show");
 					return 0;
 				}
-				Log.Write("Started " + Setup.Version + (args.Length > 0 ? " " + string.Join(" ", args) : ""));
-				return BuildApp().StartWithClassicDesktopLifetime(args, ShutdownMode.OnExplicitShutdown);
+				Log.Write("Started " + Setup.Version + (args.Length > 0 ? " " + string.Join(" ", args) : "") + (Setup.Unpacked ? " (unpacked, no FUSE)" : ""));
+				try
+				{
+					return BuildApp().StartWithClassicDesktopLifetime(args, ShutdownMode.OnExplicitShutdown);
+				}
+				catch (Exception ex)
+				{
+					// Said in the log, the terminal and a desktop notice, instead of closing without a word.
+					Log.Write("Could not start: " + ex);
+					string message = T.F("error.start", ex.GetBaseException().Message, Log.PathName);
+					Console.Error.WriteLine(message);
+					Setup.Notice(T.S("req.title"), message);
+					return 1;
+				}
 			}
 		}
 

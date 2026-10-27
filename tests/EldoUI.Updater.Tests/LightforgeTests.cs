@@ -34,7 +34,7 @@ namespace EldoUI.Updater.Tests
 		[InlineData("2.40", CheckState.Ok)]
 		[InlineData("3.0", CheckState.Ok)]
 		[InlineData("2.35", CheckState.Warn)]
-		[InlineData("2.34", CheckState.Warn)]
+		[InlineData("2.34", CheckState.Fail)]
 		[InlineData("2.31", CheckState.Fail)]
 		[InlineData(null, CheckState.Fail)]
 		[InlineData("musl", CheckState.Fail)]

@@ -2,6 +2,18 @@
 
 Each release of the EldoUI Updater. The newest is at the top.
 
+## [1.2.11] - 2026-10-27
+
+### Improved
+- On Linux, the updater checks before it installs itself that the system has what its window needs (a graphical session and the fontconfig and X11 libraries). If something is missing, it installs nothing and says what to add, with the install command for your distribution (Ubuntu, Debian, Linux Mint, Fedora, Arch, SteamOS, openSUSE and others of their families).
+- New `--check-system` option on Linux: run `./EldoUI-Updater-x86_64.AppImage --check-system` to see whether your system has everything the updater and WoW Linux setup need, and whether your distribution is one this version was tested on.
+- If the window cannot open for another reason, the updater now says so in a desktop notice and in its log instead of closing without a word.
+- On a new PC where WoW: Forever is not installed yet, the updater keeps looking for it. As soon as the game is installed (with **WoW Linux setup** and Lightforge, or any other way), EldoUI is installed within a few minutes, without choosing a folder. A game Lightforge keeps on another drive is found too.
+- **WoW Linux setup** checks the libraries Lightforge's window needs and, for anything missing, shows the exact install command for your distribution. The 32-bit check now shows the command as well, and says that only Battle.net needs it.
+
+### Fixed
+- On a Linux system without FUSE, the updater now also starts from the app menu and at login, not only the first time. It unpacks itself on each start there, which takes a few seconds longer. Installs from earlier versions are corrected the next time the updater starts.
+
 ## [1.2.10] - 2026-10-26
 
 ### Improved

@@ -39,8 +39,19 @@ Lutris, Bottles and Steam's Proton prefixes (native and Flatpak).
    Wine prefix that holds it.
 
 On GNOME, the tray icon needs the *AppIndicator and KStatusNotifierItem Support* extension (Ubuntu has it).
-Without a tray the window opens instead. If the AppImage mentions FUSE, install your distribution's `fuse3`
-package.
+Without a tray the window opens instead.
+
+Every desktop distribution has what the updater needs. Before it installs itself, it checks for a graphical
+session and the fontconfig and X11 libraries; if one is missing it installs nothing and shows the install
+command for your distribution. To check a system yourself, run
+`./EldoUI-Updater-x86_64.AppImage --check-system`.
+
+If the AppImage says it cannot mount itself (FUSE), either install your distribution's `fuse3` package or
+start it once with `APPIMAGE_EXTRACT_AND_RUN=1 ./EldoUI-Updater-x86_64.AppImage`. It then unpacks itself on
+each start, from the app menu and at login too, which takes a few seconds longer.
+
+Tested with each release on Ubuntu, Linux Mint, Debian, Fedora, Arch, openSUSE and a Steam Deck setup: see
+[Tested Linux distributions](https://github.com/Eldodeldo/EldoUI-updater-app/wiki/Tested-Linux-distributions).
 
 No WoW on Linux yet? See [WoW Linux setup](#wow-linux-setup) below.
 
@@ -116,10 +127,12 @@ folders, Wine prefixes, settings, the addon catalog, sources and scan) and is wh
 engine of WoW Linux setup (`src/EldoUI.Updater.Linux/Lightforge.cs`). The catalog is rebuilt with
 `tools/build_catalog.py`, and the notes on what EldoUI does for each addon with `tools/build_coverage.py`
 from the source of each EldoUI release and the reviewed answers in `tools/coverage-review.json`. Both apps take `--selftest` and
-`--snapshot <folder>`.
+`--snapshot <folder>`; the Linux app also takes `--check-system`.
 
 To release, raise `<Version>` in `src/Directory.Build.props`, add its section at the top of `CHANGELOG.md`
 and merge. The build workflow publishes `v<version>` with both files and `SHA256SUMS.txt`.
+
+The Linux install is tested on several distributions with `tests/linux-distros/` (see its README).
 
 Bug reports and ideas: [Issues](https://github.com/Eldodeldo/EldoUI-updater-app/issues). For EldoUI itself,
 use the [EldoUI issues](https://github.com/Eldodeldo/EldoUI/issues).
