@@ -44,6 +44,15 @@ namespace EldoUI.Updater
 			{
 				var system = Requirements.Read();
 				Console.WriteLine(Requirements.Report(system, Setup.Version));
+				// What WoW Linux setup checks before it installs Lightforge, with the same fixes it shows.
+				Console.WriteLine();
+				Console.WriteLine(T.S("lf.title") + ":");
+				foreach (var c in LightforgeChecks.Evaluate(SystemInfo.Read(Setup.Home)))
+				{
+					string state = c.State == CheckState.Ok ? "ok  " : c.State == CheckState.Warn ? "note" : "FAIL";
+					Console.WriteLine("  " + state + "  " + T.S(c.Key) + ": " + (c.Found ?? (c.State == CheckState.Ok ? T.S("lf.found.yes") : T.S("lf.found.none"))));
+					if (c.State != CheckState.Ok) Console.WriteLine("        " + (c.Fix ?? T.S("lf.fix." + c.Key.Substring("lf.check.".Length) + (c.Key == "lf.check.glibc" ? (c.State == CheckState.Warn ? ".warn" : ".fail") : ""))));
+				}
 				return Requirements.CanRun(system) ? 0 : 1;
 			}
 			if (Has("--uninstall"))

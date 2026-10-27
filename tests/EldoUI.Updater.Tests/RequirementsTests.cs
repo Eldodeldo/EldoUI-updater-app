@@ -126,3 +126,68 @@ namespace EldoUI.Updater.Tests
 		}
 	}
 }
+
+namespace EldoUI.Updater.Tests
+{
+	public class LightforgeDependencyTests
+	{
+		public LightforgeDependencyTests() { LinuxTexts.Apply(); }
+
+		static SystemInfo Info(string family, params string[] missing)
+		{
+			return new SystemInfo
+			{
+				Distribution = "Test", Architecture = "x86_64", Glibc = "2.39", FreeBytes = 50L << 30, Has32BitLoader = false, HasFonts = true,
+				Family = family, MissingWindowLibraries = missing.ToList(),
+			};
+		}
+
+		static SystemCheck Check(SystemInfo info, string key) { return LightforgeChecks.Evaluate(info).Single(c => c.Key == key); }
+
+		[Fact]
+		public void TheWindowLibrariesAreChecked()
+		{
+			Assert.Equal(CheckState.Ok, Check(Info("debian"), "lf.check.window").State);
+			var c = Check(Info("debian", "libxkbcommon-x11.so.0"), "lf.check.window");
+			Assert.Equal(CheckState.Warn, c.State);
+			Assert.Equal("libxkbcommon-x11.so.0", c.Found);
+			Assert.Contains("sudo apt install libxkbcommon-x11-0", c.Fix);
+			Assert.True(LightforgeChecks.CanInstall(LightforgeChecks.Evaluate(Info("debian", "libxkbcommon-x11.so.0"))));
+		}
+
+		[Theory]
+		[InlineData("debian", "sudo apt install libudev1 libxkbcommon-x11-0")]
+		[InlineData("fedora", "sudo dnf install systemd-libs libxkbcommon-x11")]
+		[InlineData("arch", "sudo pacman -S systemd-libs libxkbcommon-x11")]
+		[InlineData("suse", "sudo zypper install libudev1 libxkbcommon-x11-0")]
+		public void EachFamilyGetsItsPackageNames(string family, string command)
+		{
+			Assert.Contains(command, Check(Info(family, "libudev.so.1", "libxkbcommon-x11.so.0"), "lf.check.window").Fix);
+		}
+
+		[Fact]
+		public void AnUnknownFamilyGetsTheGeneralAdvice()
+		{
+			var c = Check(Info(null, "libXi.so.6"), "lf.check.window");
+			Assert.Equal(T.S("lf.fix.window"), c.Fix);
+			Assert.Null(Check(Info(null), "lf.check.32bit").Fix);
+		}
+
+		[Theory]
+		[InlineData("fedora", "sudo dnf install wine.i686")]
+		[InlineData("debian", "sudo apt install wine32:i386")]
+		[InlineData("arch", "sudo pacman -S wine")]
+		[InlineData("suse", "sudo zypper install wine-32bit")]
+		public void ThirtyTwoBitNamesLightforgesCommand(string family, string command)
+		{
+			Assert.Contains(command, Check(Info(family), "lf.check.32bit").Fix);
+		}
+
+		[Fact]
+		public void EveryWindowLibraryHasAPackageInEveryFamily()
+		{
+			foreach (string family in new[] { "debian", "fedora", "arch", "suse" })
+				Assert.Equal(SystemInfo.WindowLibraries.Length > 0, LightforgeChecks.WindowPackages(SystemInfo.WindowLibraries, family) != null);
+		}
+	}
+}

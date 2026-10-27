@@ -29,11 +29,16 @@ when the host reaches the internet through a proxy. Results land in `tests/linux
 7. **Second start:** hands over to the running copy instead of starting another.
 8. **`--uninstall`:** removes the program, entries, settings and log; EldoUI stays in the game.
 
+**Clean installs (`clean-test.sh`):** the updater is installed on a home with no Wine prefix and no game. The
+game then appears where Lightforge installs it (its default library, or a library on another drive that only
+Lightforge's read-only status names, played by a stand-in that answers in Lightforge's format). The updater
+must find it and install EldoUI by itself, without the player choosing a folder.
+
 On a system without a desktop (`EXPECT=blocked`), the first start must stop with a message that names the
 missing packages with the install command for that distribution, and install nothing.
 
 ## What a container cannot show
 
-The tray icon (it needs a desktop panel), desktop notices, the file manager's "Allow executing" switch, a
-real log-in by the desktop session, Wayland sessions, and Battle.net or the game itself. These are checked
-by hand on a real desktop.
+Lightforge's own downloads (Proton-GE, Battle.net and the game), the tray icon (it needs a desktop panel),
+desktop notices, the file manager's "Allow executing" switch, a real log-in by the desktop session, and
+Wayland sessions. These are checked by hand on a real desktop.

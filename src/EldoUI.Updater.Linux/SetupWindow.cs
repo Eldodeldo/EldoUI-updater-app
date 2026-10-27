@@ -247,7 +247,7 @@ namespace EldoUI.Updater
 				Children =
 				{
 					line,
-					new TextBlock { Text = T.S(fix), TextWrapping = TextWrapping.Wrap, FontSize = 11.5, Foreground = Palette.B(color), Margin = new Thickness(17, 2, 0, 0) },
+					new TextBlock { Text = c.Fix ?? T.S(fix), TextWrapping = TextWrapping.Wrap, FontSize = 11.5, Foreground = Palette.B(color), Margin = new Thickness(17, 2, 0, 0) },
 				},
 			};
 		}

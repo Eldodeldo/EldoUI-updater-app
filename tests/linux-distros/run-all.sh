@@ -1,7 +1,7 @@
 #!/bin/bash
 # The whole matrix: desktop images of each family, two desktops without FUSE, a Steam Deck setup (Arch,
 # read-only system, "deck" user, game in an SD-card Steam library), and plain images without a desktop,
-# where the updater must stop with a message before it installs anything.
+# where the updater must stop with a message before it installs anything; then three clean installs.
 # Usage: run-all.sh [AppImage]   (default: the newest release from GitHub)
 # Needs Docker, Xvfb, xwd and ImageMagick's convert on the host, and /dev/fuse.
 set -eu
@@ -37,6 +37,15 @@ EXPECT=blocked ./run-target.sh opensuse-tumbleweed-plain "$R/opensuse/tumbleweed
 EXPECT=blocked ./run-target.sh opensuse-leap-15.6-plain "$R/opensuse/leap:15.6" 111 extract proton &
 EXPECT=blocked ./run-target.sh arch-plain "$R/library/archlinux" 112 extract proton &
 wait
+# Clean installs: the updater first, the game later (in Lightforge's default library, or in a Lightforge
+# library on a second drive that only Lightforge's status names).
+export TEST_SCRIPT=clean-test.sh
+./run-target.sh clean-ubuntu-24.04 "$R/library/ubuntu:24.04" 140 fuse default "$UB libssl3t64 fuse3" &
+./run-target.sh clean-fedora-lightforge "$R/linuxserver/webtop:fedora-xfce" 141 fuse lightforge &
+USER_HOME=/home/deck ./run-target.sh clean-steamdeck "$R/linuxserver/webtop:arch-xfce" 142 fuse default true \
+	"--read-only --tmpfs /tmp:exec,mode=1777 --tmpfs /run --tmpfs /home/deck:exec,mode=755,uid=1000,gid=1000" &
+wait
+unset TEST_SCRIPT
 grep -h "^RESULT" results/*/result.txt >/dev/null
 for d in results/*/; do echo "$(basename "$d"): $(tail -1 "$d/result.txt")"; done
 ! grep -q "^FAIL" results/*/result.txt

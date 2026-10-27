@@ -47,6 +47,8 @@ namespace EldoUI.Updater
 		readonly BootCheck _boot = new BootCheck(DateTime.UtcNow);
 		// A window asked for at start opens once that check is done, so a self-update never closes it again.
 		bool _showPending;
+		int _searchTicks;
+		bool _lightforgeAsked;
 
 		public TrayApp(bool showWindow, bool justUpdated, Action shutdown)
 		{
@@ -119,6 +121,7 @@ namespace EldoUI.Updater
 			{
 				if (_app != null && SelfUpdatePolicy.Due(_appAt, DateTime.UtcNow)) InstallApp();
 				else if (Due()) Check(false, false);
+				else if (string.IsNullOrEmpty(_settings.AddOnsDir)) WatchForGame();
 			};
 			_timer.Start();
 
@@ -233,6 +236,44 @@ namespace EldoUI.Updater
 			Save();
 		}
 
+		/// <summary>
+		/// While no WoW folder is known (a new PC, the game not installed yet): looks again every minute on disk, and
+		/// every five minutes asks Lightforge where its WoW: Forever is. When the game turns up, EldoUI is installed
+		/// right away instead of at the next three-hourly check. Nothing goes to the network until the game is found.
+		/// </summary>
+		async void WatchForGame()
+		{
+			if (_engine.Busy) return;
+			_searchTicks++;
+			FindFolder();
+			if (string.IsNullOrEmpty(_settings.AddOnsDir) && _searchTicks % 5 == 0) await FindLightforgeFolder();
+			if (!string.IsNullOrEmpty(_settings.AddOnsDir)) Check(false, false);
+		}
+
+		/// <summary>
+		/// Lightforge's WoW: Forever, read with its read-only status command, when Lightforge is installed and nothing
+		/// else was found (it may keep the game in a library on another drive). Used only once the game is installed.
+		/// </summary>
+		async Task FindLightforgeFolder()
+		{
+			if (!string.IsNullOrEmpty(_settings.AddOnsDir)) return;
+			try
+			{
+				var plan = LightforgePlan.For(Setup.Home, Environment.GetEnvironmentVariable("XDG_DATA_HOME"));
+				if (!File.Exists(plan.Cli)) return;
+				var status = await new LightforgeProbe(new ProcessRunner()).ReadAsync(plan, CancellationToken.None);
+				string addOns = status.ForeverAddOns;
+				if (addOns == null || !string.IsNullOrEmpty(_settings.AddOnsDir)) return;
+				_settings.InstalledFolders.Clear();
+				_settings.ExtraVersions.Clear();
+				_settings.ExtraFiles.Clear();
+				_settings.AddOnsDir = addOns;
+				Log.Write("Found WoW: Forever AddOns through Lightforge at " + addOns);
+				Save();
+			}
+			catch (Exception ex) { Log.Write("Lightforge not asked for its game folder: " + ex.Message); }
+		}
+
 		/// <summary>Checks for a new EldoUI. user: the player asked. install: install even if automatic install is off.</summary>
 		async void Check(bool user, bool install, bool installExtras = false, bool showWindow = true)
 		{
@@ -242,6 +283,12 @@ namespace EldoUI.Updater
 				return;
 			}
 			FindFolder();
+			// Once per run, Lightforge is asked too when nothing was found on disk (the timer asks again later).
+			if (string.IsNullOrEmpty(_settings.AddOnsDir) && !_lightforgeAsked)
+			{
+				_lightforgeAsked = true;
+				await FindLightforgeFolder();
+			}
 			if (string.IsNullOrEmpty(_settings.AddOnsDir))
 			{
 				UpdateView(null);

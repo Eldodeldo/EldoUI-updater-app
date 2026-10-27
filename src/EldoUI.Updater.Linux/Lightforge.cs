@@ -53,6 +53,8 @@ namespace EldoUI.Updater
 		public string Key;
 		public CheckState State;
 		public string Found;
+		/// <summary>What to do about it, when it is more than the fixed text of the key (an install command for this distribution).</summary>
+		public string Fix;
 	}
 
 	/// <summary>What the system check reads. Filled from the real system by Read, or by hand in tests.</summary>
@@ -62,11 +64,30 @@ namespace EldoUI.Updater
 		public long FreeBytes = -1;
 		public bool Has32BitLoader;
 		public bool HasFonts;
+		/// <summary>The package family ("debian", "fedora", "arch", "suse"), or null.</summary>
+		public string Family;
+		/// <summary>Libraries Lightforge's window loads that this system does not have.</summary>
+		public List<string> MissingWindowLibraries = new List<string>();
+
+		/// <summary>What Lightforge's window loads: libudev directly, the rest when it opens (keyboard and X11/XWayland).</summary>
+		public static readonly string[] WindowLibraries =
+		{
+			"libudev.so.1", "libxkbcommon.so.0", "libxkbcommon-x11.so.0", "libX11.so.6", "libX11-xcb.so.1", "libXcursor.so.1", "libXi.so.6",
+		};
 
 		public static SystemInfo Read(string home)
 		{
+			var os = new LinuxSystem();
+			foreach (string f in new[] { "/etc/os-release", "/usr/lib/os-release" })
+			{
+				try { if (File.Exists(f)) { Requirements.ReadOsRelease(os, File.ReadAllText(f)); break; } }
+				catch (IOException) { }
+				catch (UnauthorizedAccessException) { }
+			}
 			var info = new SystemInfo
 			{
+				Family = Requirements.Family(os),
+				MissingWindowLibraries = WindowLibraries.Where(l => !Loads(l)).ToList(),
 				Distribution = OsRelease("/etc/os-release") ?? OsRelease("/usr/lib/os-release"),
 				Architecture = RuntimeInformation.OSArchitecture == System.Runtime.InteropServices.Architecture.X64 ? "x86_64"
 					: RuntimeInformation.OSArchitecture == System.Runtime.InteropServices.Architecture.Arm64 ? "aarch64"
@@ -106,6 +127,17 @@ namespace EldoUI.Updater
 			catch (EntryPointNotFoundException) { return null; }
 		}
 
+		static bool Loads(string library)
+		{
+			try
+			{
+				if (!NativeLibrary.TryLoad(library, out IntPtr handle)) return false;
+				NativeLibrary.Free(handle);
+				return true;
+			}
+			catch (Exception) { return false; }
+		}
+
 		static bool HasFont(string dir)
 		{
 			try
@@ -136,12 +168,22 @@ namespace EldoUI.Updater
 			else
 			{
 				int major = int.Parse(v.Groups[1].Value), minor = int.Parse(v.Groups[2].Value);
-				// Lightforge asks for 2.36; its programs load from 2.34, which its authors have not tested.
-				glibc.State = major > 2 || (major == 2 && minor >= 36) ? CheckState.Ok : major == 2 && minor >= 34 ? CheckState.Warn : CheckState.Fail;
+				// Lightforge asks for 2.36; its window needs 2.35 (it runs on Ubuntu 22.04), its authors have not tested that.
+				glibc.State = major > 2 || (major == 2 && minor >= 36) ? CheckState.Ok : major == 2 && minor >= 35 ? CheckState.Warn : CheckState.Fail;
 			}
 			list.Add(glibc);
 			list.Add(new SystemCheck { Key = "lf.check.fonts", State = info.HasFonts ? CheckState.Ok : CheckState.Warn });
-			list.Add(new SystemCheck { Key = "lf.check.32bit", State = info.Has32BitLoader ? CheckState.Ok : CheckState.Warn });
+			var window = new SystemCheck { Key = "lf.check.window", State = info.MissingWindowLibraries.Count == 0 ? CheckState.Ok : CheckState.Warn };
+			if (window.State != CheckState.Ok)
+			{
+				window.Found = string.Join(", ", info.MissingWindowLibraries);
+				string cmd = InstallCommand(WindowPackages(info.MissingWindowLibraries, info.Family), info.Family);
+				window.Fix = cmd != null ? T.F("lf.fix.window.cmd", cmd) : T.S("lf.fix.window");
+			}
+			list.Add(window);
+			var bit32 = new SystemCheck { Key = "lf.check.32bit", State = info.Has32BitLoader ? CheckState.Ok : CheckState.Warn };
+			if (!info.Has32BitLoader && ThirtyTwoBitCommand(info.Family) != null) bit32.Fix = T.F("lf.fix.32bit.cmd", ThirtyTwoBitCommand(info.Family));
+			list.Add(bit32);
 			list.Add(new SystemCheck
 			{
 				Key = "lf.check.disk",
@@ -152,6 +194,51 @@ namespace EldoUI.Updater
 		}
 
 		public static bool CanInstall(IEnumerable<SystemCheck> checks) { return checks.All(c => c.State != CheckState.Fail); }
+
+		/// <summary>The package of each window library in a family, in the order of WindowLibraries.</summary>
+		static readonly Dictionary<string, string[]> WindowPackageNames = new Dictionary<string, string[]>
+		{
+			{ "debian", new[] { "libudev1", "libxkbcommon0", "libxkbcommon-x11-0", "libx11-6", "libx11-xcb1", "libxcursor1", "libxi6" } },
+			{ "fedora", new[] { "systemd-libs", "libxkbcommon", "libxkbcommon-x11", "libX11", "libX11-xcb", "libXcursor", "libXi" } },
+			{ "arch", new[] { "systemd-libs", "libxkbcommon", "libxkbcommon-x11", "libx11", "libx11", "libxcursor", "libxi" } },
+			{ "suse", new[] { "libudev1", "libxkbcommon0", "libxkbcommon-x11-0", "libX11-6", "libX11-xcb1", "libXcursor1", "libXi6" } },
+		};
+
+		/// <summary>The packages that provide the missing window libraries in a family, or null for an unknown family.</summary>
+		public static string WindowPackages(IEnumerable<string> missing, string family)
+		{
+			string[] names;
+			if (family == null || !WindowPackageNames.TryGetValue(family, out names)) return null;
+			var list = missing.Select(l => Array.IndexOf(SystemInfo.WindowLibraries, l)).Where(i => i >= 0).Select(i => names[i]).Distinct().ToList();
+			return list.Count == 0 ? null : string.Join(" ", list);
+		}
+
+		/// <summary>The command that installs packages in a family, or null.</summary>
+		public static string InstallCommand(string packages, string family)
+		{
+			if (string.IsNullOrEmpty(packages)) return null;
+			switch (family)
+			{
+				case "debian": return "sudo apt install " + packages;
+				case "fedora": return "sudo dnf install " + packages;
+				case "arch": return "sudo pacman -S " + packages;
+				case "suse": return "sudo zypper install " + packages;
+				default: return null;
+			}
+		}
+
+		/// <summary>The 32-bit libraries Battle.net needs, as Lightforge's own install guide names them for each family.</summary>
+		public static string ThirtyTwoBitCommand(string family)
+		{
+			switch (family)
+			{
+				case "debian": return "sudo dpkg --add-architecture i386 && sudo apt update && sudo apt install wine32:i386";
+				case "fedora": return "sudo dnf install wine.i686";
+				case "arch": return "sudo pacman -S wine";
+				case "suse": return "sudo zypper install wine-32bit";
+				default: return null;
+			}
+		}
 	}
 
 	/// <summary>Where Lightforge's files go: the same places its own installer uses, all in the player's home folder.</summary>

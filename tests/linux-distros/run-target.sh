@@ -3,7 +3,7 @@
 # (uid 1000) as a desktop has, runs player-test.sh as that user and saves the output and a picture of the
 # updater's window in results/<name>/.
 # Usage: run-target.sh <name> <image> <display number> <fuse|extract> <prefix kind> [root setup command] [docker options]
-# Environment: EXPECT=ok|blocked, USER_HOME (default /home/player), ELDOUI_VERSION (the newest EldoUI release),
+# Environment: TEST_SCRIPT (default player-test.sh; clean-test.sh for a clean home), EXPECT=ok|blocked, USER_HOME (default /home/player), ELDOUI_VERSION (the newest EldoUI release),
 # and HTTPS_PROXY / SSL_CERT_FILE when the machine reaches the internet through a proxy.
 set -u
 NAME="$1"; IMAGE="$2"; DISP="$3"; MODE="$4"; KIND="$5"; SETUP="${6:-true}"; EXTRA="${7:-}"
@@ -39,7 +39,7 @@ echo "setup exit $?" >> "$OUT/setup.txt"
 
 ( docker exec -u 1000:1000 -e HOME="$UHOME" -e USER="$(basename "$UHOME")" -e DISPLAY=":$DISP" -e XDG_RUNTIME_DIR=/tmp/xdg-1000 \
 	"${PROXY_ENV[@]}" -w "$UHOME" "$C" \
-	bash /kit/player-test.sh "$MODE" "$WANT" "$KIND" "${EXPECT:-ok}" release > "$OUT/result.txt" 2>&1 ) &
+	bash "/kit/${TEST_SCRIPT:-player-test.sh}" "$MODE" "$WANT" "$KIND" "${EXPECT:-ok}" release > "$OUT/result.txt" 2>&1 ) &
 TPID=$!
 # A picture of the updater's window once EldoUI is installed.
 for i in $(seq 1 400); do

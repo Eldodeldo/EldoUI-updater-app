@@ -56,7 +56,7 @@ namespace EldoUI.Updater
 
 				var system = LightforgeChecks.Evaluate(SystemInfo.Read(home));
 				var glibc = system.Find(c => c.Key == "lf.check.glibc");
-				Check(system.Count == 6 && glibc != null && !string.IsNullOrEmpty(glibc.Found), "the setup assistant reads this system (glibc " + (glibc != null ? glibc.Found : "?") + ")");
+				Check(system.Count == 7 && glibc != null && !string.IsNullOrEmpty(glibc.Found), "the setup assistant reads this system (glibc " + (glibc != null ? glibc.Found : "?") + ")");
 				var plan = LightforgePlan.For(home, null);
 				Check(plan.Cli == Path.Combine(home, ".local", "bin", "lightforge") && plan.Desktop.StartsWith(Path.Combine(home, ".local", "share", "applications")), "Lightforge's files go only into the home folder");
 
