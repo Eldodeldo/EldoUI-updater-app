@@ -169,6 +169,27 @@ namespace EldoUI.Updater
 			return unpack ? "env APPIMAGE_EXTRACT_AND_RUN=1 " + exec : exec;
 		}
 
+		/// <summary>
+		/// An existing desktop entry with only its launch command replaced. Every other line stays as the player or
+		/// the desktop left it, so a login entry switched off in the desktop's settings stays off.
+		/// </summary>
+		public static string WithExec(string entry, string exec)
+		{
+			var lines = (entry ?? "").Split('\n');
+			bool inMain = false, done = false;
+			for (int i = 0; i < lines.Length; i++)
+			{
+				string line = lines[i].TrimEnd('\r');
+				if (line.StartsWith("[")) inMain = line == "[Desktop Entry]";
+				else if (inMain && !done && line.StartsWith("Exec="))
+				{
+					lines[i] = "Exec=" + exec + (lines[i].EndsWith("\r") ? "\r" : "");
+					done = true;
+				}
+			}
+			return done ? string.Join("\n", lines) : entry;
+		}
+
 		/// <summary>Reads an os-release file into a LinuxSystem (the other fields stay as they are).</summary>
 		public static void ReadOsRelease(LinuxSystem s, string text)
 		{

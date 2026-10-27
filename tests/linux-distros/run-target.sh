@@ -8,7 +8,7 @@
 set -u
 NAME="$1"; IMAGE="$2"; DISP="$3"; MODE="$4"; KIND="$5"; SETUP="${6:-true}"; EXTRA="${7:-}"
 KIT="$(cd "$(dirname "$0")" && pwd)"
-OUT="$KIT/results/$NAME"; mkdir -p "$OUT"
+OUT="$KIT/results/$NAME"; mkdir -p "$OUT"; rm -f "$OUT/result.txt"
 WANT="${ELDOUI_VERSION:?set ELDOUI_VERSION to the newest EldoUI release}"
 UHOME="${USER_HOME:-/home/player}"
 C="eldoui-updater-test-$NAME"

@@ -124,6 +124,25 @@ namespace EldoUI.Updater.Tests
 			Assert.Equal("env APPIMAGE_EXTRACT_AND_RUN=1 \"/home/p/x.AppImage\"", Requirements.DesktopExec("/home/p/x.AppImage", "", true));
 			Assert.Equal("\"/home/p/a\\\"b.AppImage\"", Requirements.DesktopExec("/home/p/a\"b.AppImage", null, false));
 		}
+
+		[Fact]
+		public void RefreshingAnEntryKeepsALoginEntryThatWasSwitchedOff()
+		{
+			string entry = "[Desktop Entry]\nType=Application\nName=EldoUI Updater\nExec=\"/home/p/x.AppImage\" --tray\nX-GNOME-Autostart-enabled=false\nHidden=true\n";
+			string updated = Requirements.WithExec(entry, "env APPIMAGE_EXTRACT_AND_RUN=1 \"/home/p/x.AppImage\" --tray");
+			Assert.Equal(entry.Replace("Exec=\"", "Exec=env APPIMAGE_EXTRACT_AND_RUN=1 \""), updated);
+			Assert.Contains("X-GNOME-Autostart-enabled=false", updated);
+			Assert.Contains("Hidden=true", updated);
+		}
+
+		[Fact]
+		public void RefreshingChangesOnlyTheMainGroupsCommand()
+		{
+			string entry = "[Desktop Entry]\r\nExec=old\r\nName=EldoUI Updater\r\n\r\n[Desktop Action Check]\r\nExec=other\r\n";
+			Assert.Equal(entry.Replace("Exec=old", "Exec=new"), Requirements.WithExec(entry, "new"));
+			Assert.Equal("[Desktop Entry]\nName=x\n", Requirements.WithExec("[Desktop Entry]\nName=x\n", "new"));
+			Assert.Equal(entry, Requirements.WithExec(entry, "old"));
+		}
 	}
 }
 

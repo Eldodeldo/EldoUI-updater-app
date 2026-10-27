@@ -46,6 +46,14 @@ USER_HOME=/home/deck ./run-target.sh clean-steamdeck "$R/linuxserver/webtop:arch
 	"--read-only --tmpfs /tmp:exec,mode=1777 --tmpfs /run --tmpfs /home/deck:exec,mode=755,uid=1000,gid=1000" &
 wait
 unset TEST_SCRIPT
-grep -h "^RESULT" results/*/result.txt >/dev/null
-for d in results/*/; do echo "$(basename "$d"): $(tail -1 "$d/result.txt")"; done
-! grep -q "^FAIL" results/*/result.txt
+# Every target must end with its result line and no failure; a target that did not start or stopped early
+# counts as failed.
+failed=0
+for n in ubuntu-24.04 ubuntu-22.04 mint-22 debian-12-desktop fedora-desktop arch-desktop opensuse-leap-15.5-desktop-nofuse \
+	ubuntu-24.04-nofuse steamdeck debian-13-plain fedora-43-plain opensuse-tumbleweed-plain opensuse-leap-15.6-plain arch-plain \
+	clean-ubuntu-24.04 clean-fedora-lightforge clean-steamdeck; do
+	last="$(tail -1 "results/$n/result.txt" 2>/dev/null || echo "no result")"
+	echo "$n: $last"
+	echo "$last" | grep -Eq '^RESULT pass=[1-9][0-9]* fail=0$' || failed=$((failed+1))
+done
+[ "$failed" -eq 0 ] || { echo "$failed target(s) failed"; exit 1; }

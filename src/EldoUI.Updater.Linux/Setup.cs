@@ -128,16 +128,25 @@ namespace EldoUI.Updater
 
 		/// <summary>
 		/// Brings the app menu and login entries in line with how this copy starts (with or without FUSE), for an
-		/// install made before the entries knew about it, or a system that gained or lost FUSE since.
+		/// install made before the entries knew about it, or a system that gained or lost FUSE since. Only the
+		/// launch command changes: a login entry the player switched off in the desktop's settings stays off.
 		/// </summary>
 		public static void RefreshEntries()
 		{
 			try
 			{
-				if (File.Exists(MenuEntry)) WriteDesktop(MenuEntry, "");
-				if (File.Exists(AutostartEntry)) WriteDesktop(AutostartEntry, "--tray");
+				RefreshExec(MenuEntry, "");
+				RefreshExec(AutostartEntry, "--tray");
 			}
 			catch (Exception ex) { Log.Write("App menu entries not refreshed: " + ex.Message); }
+		}
+
+		static void RefreshExec(string path, string args)
+		{
+			if (!File.Exists(path)) return;
+			string text = File.ReadAllText(path);
+			string updated = Requirements.WithExec(text, Requirements.DesktopExec(InstalledApp, args, Unpacked));
+			if (updated != text) File.WriteAllText(path, updated);
 		}
 
 		/// <summary>A desktop notice through notify-send, when the desktop has it; otherwise only the log and the terminal say it.</summary>
