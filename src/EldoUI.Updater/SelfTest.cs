@@ -118,6 +118,21 @@ namespace EldoUI.Updater
 						var focused = question.ActiveControl as Button;
 						check(!question.DeleteSettings && focused != null && focused.DialogResult == DialogResult.Cancel, "the uninstall question keeps saved settings and has Cancel ready");
 					}
+					string savedDir = Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(addOns)), "WTF", "Account", "PLAYER", "SavedVariables");
+					Directory.CreateDirectory(savedDir);
+					File.WriteAllText(Path.Combine(savedDir, "SomeOtherAddon.lua"), "-- saved");
+					var withSettings = AddonRemover.Plan(addOns, AddonScanner.Scan(addOns, settings), new[] { otherKey });
+					using (var question = new UninstallDialog(withSettings, Assets.Icon(false)) { StartPosition = FormStartPosition.Manual, Location = new Point(-3000, -3000) })
+					{
+						question.Show();
+						Application.DoEvents();
+						var box = question.Controls.OfType<ECheck>().Single();
+						var text = question.Controls.OfType<Label>().First(l => l.Text == AddonRows.RemovalBody(withSettings));
+						check(box.Visible && box.Top >= text.Bottom && box.Bottom <= question.ClientSize.Height, "the saved settings box has its own place in the uninstall question");
+						box.Checked = true;
+						question.Hide();
+						check(question.DeleteSettings, "a ticked saved settings box is read after the question closes");
+					}
 					check(Directory.Exists(Path.Combine(addOns, "SomeOtherAddon")), "asking deletes nothing");
 					addonsForm.Render(AddonsView.Build(settings, null, AddonScanner.Scan(addOns, settings), true));
 					check(!install.Enabled && !recommended.Enabled, "nothing can be installed while a check runs");

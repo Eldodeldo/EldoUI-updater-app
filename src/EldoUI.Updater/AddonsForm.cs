@@ -399,8 +399,10 @@ namespace EldoUI.Updater
 		readonly Label _title, _text, _hint;
 		readonly ECheck _box;
 		readonly EButton _yes, _no;
+		// Kept apart from the box's Visible, which reads false while the dialog itself is hidden (before it opens and after it closes).
+		readonly bool _hasSettings;
 
-		public bool DeleteSettings { get { return _box.Visible && _box.Checked; } }
+		public bool DeleteSettings { get { return _hasSettings && _box.Checked; } }
 
 		public UninstallDialog(RemovalPlan plan, Icon icon)
 		{
@@ -420,6 +422,7 @@ namespace EldoUI.Updater
 			_title = new Label { Text = Text, Font = _head, ForeColor = Theme.Text, AutoSize = false };
 			_text = new Label { Text = AddonRows.RemovalBody(plan), Font = _body, ForeColor = Theme.Muted, AutoSize = false };
 			string box = AddonRows.RemovalBox(plan);
+			_hasSettings = box != null;
 			_box = new ECheck { Text = box ?? "", Visible = box != null, Checked = false };
 			_hint = new Label { Text = T.S("addons.uninstall.hint"), Font = _small, ForeColor = Theme.Muted, AutoSize = false, Visible = box != null };
 			_yes = new EButton { Primary = true, Text = T.S("addons.uninstall.short"), DialogResult = DialogResult.OK };
@@ -463,7 +466,7 @@ namespace EldoUI.Updater
 			h = TextRenderer.MeasureText(_text.Text, _body, new Size(inner, int.MaxValue), wrap).Height;
 			_text.SetBounds(m, y, inner, h + S(4));
 			y += h + S(14);
-			if (_box.Visible)
+			if (_hasSettings)
 			{
 				_box.SetBounds(m, y, inner, S(26));
 				y += S(30);
