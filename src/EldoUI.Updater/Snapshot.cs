@@ -51,7 +51,8 @@ namespace EldoUI.Updater
 					count++;
 				}
 			}
-			string sample = Path.Combine(Path.GetTempPath(), "eldoui-updater-snapshot-" + Guid.NewGuid().ToString("N").Substring(0, 8), "AddOns");
+			string root = Path.Combine(Path.GetTempPath(), "eldoui-updater-snapshot-" + Guid.NewGuid().ToString("N").Substring(0, 8));
+			string sample = Path.Combine(root, "_forever_", "Interface", "AddOns");
 			try
 			{
 				foreach (string lang in new[] { "en", "da" })
@@ -66,6 +67,15 @@ namespace EldoUI.Updater
 						form.ShowInstalled(true);
 						Capture(form, Path.Combine(dir, "addons-installed-" + lang + ".png"));
 						count += 2;
+						form.Mark("OldMapNotes", "MyErrorFrame");
+						Capture(form, Path.Combine(dir, "addons-installed-marked-" + lang + ".png"));
+						var plan = AddonRemover.Plan(sample, view.Installed, new[] { "OldMapNotes" });
+						using (var question = new UninstallDialog(plan, Assets.Icon(false)) { StartPosition = FormStartPosition.Manual, Location = new Point(-3000, -3000), ShowInTaskbar = false })
+						{
+							question.Show();
+							Capture(question, Path.Combine(dir, "addons-uninstall-" + lang + ".png"));
+						}
+						count += 2;
 						form.ShowInstalled(false);
 						foreach (var size in new[] { Tuple.Create("small", 720, 540), Tuple.Create("large", 1280, 820) })
 						{
@@ -78,7 +88,7 @@ namespace EldoUI.Updater
 			}
 			finally
 			{
-				try { Directory.Delete(Path.GetDirectoryName(sample), true); } catch { }
+				try { Directory.Delete(root, true); } catch { }
 			}
 			Console.WriteLine(count + " pictures in " + Path.GetFullPath(dir));
 			return count > 0 ? 0 : 1;

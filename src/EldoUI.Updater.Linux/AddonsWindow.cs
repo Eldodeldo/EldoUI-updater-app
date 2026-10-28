@@ -20,10 +20,12 @@ namespace EldoUI.Updater
 		public event Action<AddonAction, string> ActionRequested;
 		public event Action<bool> InstallClicked;
 		public event Action<string> ImportChosen, ExportChosen;
+		/// <summary>The player confirmed uninstalling these Installed rows (their keys); true: delete their saved settings too.</summary>
+		public event Action<List<string>, bool> UninstallRequested;
 		public bool AllowClose;
 
 		readonly TextBlock _heading, _intro, _message, _note, _empty;
-		readonly Button _tabFind, _tabInstalled, _install, _recommended, _import, _export, _close;
+		readonly Button _tabFind, _tabInstalled, _install, _recommended, _import, _export, _close, _uninstall;
 		readonly TextBox _search;
 		readonly ComboBox _category;
 		readonly CheckBox _showHidden;
@@ -34,6 +36,8 @@ namespace EldoUI.Updater
 		readonly List<Grid> _grids = new List<Grid>();
 		readonly Avalonia.Threading.DispatcherTimer _saveSize = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(600) };
 		AddonsView _view = new AddonsView();
+		/// <summary>The Installed rows ticked to uninstall together.</summary>
+		readonly HashSet<string> _marked = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 		WindowLayout _layout = new WindowLayout();
 		double[] _shares = ColumnLayout.Default("find");
 		int _sortColumn = -1;
@@ -83,13 +87,19 @@ namespace EldoUI.Updater
 			_category.SelectionChanged += (s, e) => { if (!_rendering) Fill(); };
 			_showHidden = new CheckBox { Foreground = Palette.B(Palette.Text), IsVisible = false, Margin = new Thickness(16, 0, 0, 0) };
 			_showHidden.IsCheckedChanged += (s, e) => { if (!_rendering) Fill(); };
+			_uninstall = MainWindow.MakeButton(170, false);
+			_uninstall.Height = 32;
+			_uninstall.IsVisible = false;
+			_uninstall.HorizontalAlignment = HorizontalAlignment.Right;
+			_uninstall.Click += (s, e) => ConfirmUninstall(_marked.ToList());
 			var tools = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*,Auto"), Margin = new Thickness(0, 10, 0, 10) };
 			Place(tools, _tabFind, 0);
 			Place(tools, _tabInstalled, 1);
 			Place(tools, _showHidden, 2);
 			Place(tools, _search, 2);
 			Place(tools, _category, 3);
-			_search.VerticalAlignment = _category.VerticalAlignment = _showHidden.VerticalAlignment = VerticalAlignment.Center;
+			Place(tools, _uninstall, 3);
+			_search.VerticalAlignment = _category.VerticalAlignment = _showHidden.VerticalAlignment = _uninstall.VerticalAlignment = VerticalAlignment.Center;
 
 			_scroll = new ScrollViewer { Content = _list, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
 			_empty = new TextBlock { Foreground = Palette.B(Palette.Muted), TextWrapping = TextWrapping.Wrap, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(20, 28), TextAlignment = TextAlignment.Center };
@@ -213,6 +223,13 @@ namespace EldoUI.Updater
 			Fill();
 		}
 
+		/// <summary>Ticks Installed rows to uninstall together (the window pictures use it).</summary>
+		public void Mark(params string[] keys)
+		{
+			foreach (string k in keys) _marked.Add(k);
+			Fill();
+		}
+
 		public void ShowMessage(string text, bool problem = false)
 		{
 			_message.Foreground = Palette.B(problem ? Palette.Warn : Palette.Accent);
@@ -224,7 +241,7 @@ namespace EldoUI.Updater
 			MainWindow.Paint(_tabFind, !_installedTab);
 			MainWindow.Paint(_tabInstalled, _installedTab);
 			_search.IsVisible = _category.IsVisible = !_installedTab;
-			_showHidden.IsVisible = _installedTab;
+			_showHidden.IsVisible = _uninstall.IsVisible = _installedTab;
 			int hidden = AddonRows.HiddenCount(_view);
 			_rendering = true;
 			_showHidden.Content = T.F("addons.showhidden", hidden);
@@ -234,7 +251,9 @@ namespace EldoUI.Updater
 			string empty;
 			if (_installedTab)
 			{
-				Rows = AddonRows.Installed(_view, _showHidden.IsChecked == true);
+				Rows = AddonRows.Installed(_view, _showHidden.IsChecked == true, _marked);
+				// A ticked row that is gone (uninstalled, hidden or moved) is no longer ticked.
+				_marked.IntersectWith(Rows.Where(x => x.Checked != null).Select(x => x.Key));
 				empty = !_view.HasFolder ? T.S("addons.nofolder") : T.S("addons.empty");
 			}
 			else
@@ -243,6 +262,8 @@ namespace EldoUI.Updater
 				Rows = AddonRows.Find(_view, _search.Text, category);
 				empty = T.S("addons.none");
 			}
+			_uninstall.Content = T.F("addons.uninstall.selected", _marked.Count);
+			_uninstall.IsEnabled = !_view.Busy && _marked.Count > 0;
 			if (_sortColumn >= 0) Rows = AddonRows.Sort(Rows, _sortColumn, _sortDescending);
 			_shares = ColumnLayout.Shares(_layout, ListKey);
 			_boxes = Rows.Any(x => x.Checked != null);
@@ -361,7 +382,13 @@ namespace EldoUI.Updater
 			if (row.Checked != null)
 			{
 				var box = new CheckBox { IsChecked = row.Checked == true, IsEnabled = enabled, VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, -6, 0, 0) };
-				box.IsCheckedChanged += (s, e) => Raise(row.Checked == true ? AddonAction.Deselect : AddonAction.Select, row.Key);
+				box.IsCheckedChanged += (s, e) =>
+				{
+					if (!_installedTab) { Raise(row.Checked == true ? AddonAction.Deselect : AddonAction.Select, row.Key); return; }
+					if (_rendering || _view.Busy) return;
+					if (!_marked.Remove(row.Key)) _marked.Add(row.Key);
+					Fill();
+				};
 				Place(grid, box, 0);
 				Grid.SetRowSpan(box, 3);
 			}
@@ -427,7 +454,7 @@ namespace EldoUI.Updater
 			foreach (var choice in row.Menu)
 			{
 				var c = choice;
-				var item = new MenuItem { Header = c.Text, IsEnabled = !_view.Busy || c.Action == AddonAction.OpenPage };
+				var item = new MenuItem { Header = c.Text, IsEnabled = !_view.Busy || c.Action == AddonAction.OpenPage || c.Action == AddonAction.OpenFolder };
 				if (c.Checked != null) { item.ToggleType = MenuItemToggleType.CheckBox; item.IsChecked = c.Checked == true; }
 				item.Click += (s, e) => Choose(c);
 				items.Add(item);
@@ -437,6 +464,7 @@ namespace EldoUI.Updater
 
 		async void Choose(MenuChoice c)
 		{
+			if (c.Action == AddonAction.Uninstall) { ConfirmUninstall(new List<string> { c.Arg }); return; }
 			if (c.Action == AddonAction.TakeOver)
 			{
 				var entry = AddonCatalog.Find(c.Arg);
@@ -451,8 +479,20 @@ namespace EldoUI.Updater
 
 		void Raise(AddonAction action, string arg)
 		{
-			if (_rendering || (_view.Busy && action != AddonAction.OpenPage)) return;
+			if (_rendering || (_view.Busy && action != AddonAction.OpenPage && action != AddonAction.OpenFolder)) return;
 			ActionRequested?.Invoke(action, arg);
+		}
+
+		/// <summary>Asks before anything is uninstalled; nothing happens unless the player says yes.</summary>
+		async void ConfirmUninstall(List<string> keys)
+		{
+			if (_view.Busy || keys.Count == 0) return;
+			var plan = AddonRemover.Plan(_view.AddOnsDir, _view.Installed, keys);
+			if (plan == null) return;
+			bool? settings = await Dialogs.ConfirmUninstall(this, plan);
+			if (settings == null) return;
+			_marked.ExceptWith(keys);
+			UninstallRequested?.Invoke(keys, settings == true);
 		}
 
 		static readonly FilePickerFileType ListFile = new FilePickerFileType("EldoUI addon list") { Patterns = new[] { "*.json" } };
@@ -500,6 +540,53 @@ namespace EldoUI.Updater
 				},
 			};
 			return dialog.ShowDialog<bool>(owner);
+		}
+
+		/// <summary>
+		/// The question before an uninstall: null when the player cancels, otherwise whether the saved settings go too.
+		/// Cancel has the focus, so Enter alone never deletes anything.
+		/// </summary>
+		public static async Task<bool?> ConfirmUninstall(Window owner, RemovalPlan plan)
+		{
+			CheckBox box;
+			var dialog = UninstallWindow(plan, out box);
+			bool yes = await dialog.ShowDialog<bool>(owner);
+			if (!yes) return null;
+			return box.IsVisible && box.IsChecked == true;
+		}
+
+		/// <summary>The uninstall question as a window (also shown on its own for the window pictures).</summary>
+		public static Window UninstallWindow(RemovalPlan plan, out CheckBox box)
+		{
+			string title = AddonRows.RemovalTitle(plan), boxText = AddonRows.RemovalBox(plan);
+			var dialog = new Window
+			{
+				Title = title, Width = 460, SizeToContent = SizeToContent.Height, CanResize = false,
+				WindowStartupLocation = WindowStartupLocation.CenterOwner,
+				Background = Palette.B(Palette.Panel), Foreground = Palette.B(Palette.Text), FontSize = 13,
+			};
+			var ok = MainWindow.MakeButton(130, true);
+			var cancel = MainWindow.MakeButton(110, false);
+			ok.Content = T.S("addons.uninstall.short");
+			cancel.Content = T.S("btn.cancel");
+			ok.Click += (s, e) => dialog.Close(true);
+			cancel.Click += (s, e) => dialog.Close(false);
+			box = new CheckBox { Content = boxText ?? "", IsChecked = false, IsVisible = boxText != null, Foreground = Palette.B(Palette.Text) };
+			var hint = new TextBlock { Text = T.S("addons.uninstall.hint"), FontSize = 11.5, TextWrapping = TextWrapping.Wrap, Foreground = Palette.B(Palette.Muted), IsVisible = boxText != null, Margin = new Thickness(28, -10, 0, 0) };
+			dialog.Content = new StackPanel
+			{
+				Margin = new Thickness(22), Spacing = 16,
+				Children =
+				{
+					new TextBlock { Text = title, FontSize = 15, FontWeight = FontWeight.Bold, TextWrapping = TextWrapping.Wrap },
+					new TextBlock { Text = AddonRows.RemovalBody(plan), TextWrapping = TextWrapping.Wrap, Foreground = Palette.B(Palette.Muted) },
+					box,
+					hint,
+					new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, HorizontalAlignment = HorizontalAlignment.Right, Children = { cancel, ok } },
+				},
+			};
+			dialog.Opened += (s, e) => cancel.Focus();
+			return dialog;
 		}
 	}
 }

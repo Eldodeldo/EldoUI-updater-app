@@ -75,6 +75,7 @@ namespace EldoUI.Updater
 				if (all) { foreach (var a in Companion.All) _settings.SelectCompanion(a.Id, true); }
 				Save(); Check(true, false, true, false);
 			};
+			_addons.UninstallRequested += UninstallAddons;
 			_addons.ImportChosen += ImportAddons;
 			_addons.ExportChosen += ExportAddons;
 			_addons.UseLayout(_settings.AddonsWindow);
@@ -129,6 +130,8 @@ namespace EldoUI.Updater
 			// The app's own updates are never announced with a notice: the window and menu show them.
 			if (justUpdated && SelfUpdatePolicy.Clear(_settings)) Save();
 			FindFolder();
+			// What an earlier uninstall could not delete at once (a file in use) goes now.
+			AddonRemover.CleanUp(_settings.AddOnsDir);
 			UpdateView(null);
 			_showPending = showWindow;
 			// The first check right at start: what it finds installs before the window opens.
@@ -629,13 +632,50 @@ namespace EldoUI.Updater
 				if (entry != null && entry.PageUrl != null) Setup.OpenPage(entry.PageUrl);
 				return;
 			}
+			if (action == AddonAction.OpenFolder)
+			{
+				string path = AddonRemover.FolderPath(_settings.AddOnsDir, arg);
+				if (path != null) Setup.Open(path);
+				return;
+			}
 			if (_engine.Busy || !AddonRows.Apply(_settings, action, arg)) return;
 			Save();
-			_addons.ShowMessage("");
+			_addons.ShowMessage(action == AddonAction.Reinstall ? T.F("addons.reinstall.started", AddonRows.CatalogName(arg)) : "");
 			// The player confirmed the take-over in the window; the check installs it over the hand-installed copy.
-			if (action == AddonAction.TakeOver || action == AddonAction.Add) Check(true, false, true, false);
+			if (action == AddonAction.TakeOver || action == AddonAction.Add || action == AddonAction.Reinstall) Check(true, false, true, false);
 			else UpdateView(_last);
 			RefreshAddons(_engine.Busy);
+		}
+
+		/// <summary>Uninstalls what the player confirmed in the Extra addons window, read again from the folder first.</summary>
+		void UninstallAddons(System.Collections.Generic.List<string> keys, bool deleteSettings)
+		{
+			if (_engine.Busy || string.IsNullOrEmpty(_settings.AddOnsDir)) return;
+			RemovalPlan plan = null;
+			try { plan = AddonRemover.Plan(_settings.AddOnsDir, AddonScanner.Scan(_settings.AddOnsDir, _settings), keys); }
+			catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { Log.Write("Could not read the AddOns folder: " + ex.Message); }
+			if (plan == null)
+			{
+				RefreshAddons(_engine.Busy);
+				_addons.ShowMessage(T.S("addons.uninstall.changed"), true);
+				return;
+			}
+			try
+			{
+				var result = AddonRemover.Remove(_settings.AddOnsDir, plan, deleteSettings);
+				AddonRemover.Forget(_settings, plan);
+				Save();
+				Log.Write("Uninstalled " + string.Join(", ", result.Removed) + (result.SettingsDeleted > 0 ? " and " + result.SettingsDeleted + " saved settings files" : ""));
+				UpdateView(_last);
+				RefreshAddons(_engine.Busy);
+				_addons.ShowMessage(AddonRows.RemovalDone(plan, result));
+			}
+			catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidDataException)
+			{
+				Log.Write("Nothing uninstalled: " + ex.Message);
+				RefreshAddons(_engine.Busy);
+				_addons.ShowMessage(T.S("addons.uninstall.failed"), true);
+			}
 		}
 
 		void ImportAddons(string path)
