@@ -2,6 +2,21 @@
 
 Each release of the EldoUI Updater. The newest is at the top.
 
+## [1.3.0] - 2026-10-28
+
+### New
+- **Uninstall addons** from **Extra addons**: every addon in the **Installed** list can be uninstalled from its **⋯** menu, whether the updater keeps it up to date, you installed it by hand or it is not in the catalog at all. EldoUI's own folders and the Eldostar guide data cannot be uninstalled here.
+- Before anything is deleted, the updater asks. The question lists the folders that go and any installed addons that need them and would stop loading.
+- An addon's saved settings in the game's WTF folder are kept unless you tick **Also delete its saved settings** in that question. Then only the files the game keeps for that addon are deleted.
+- Tick several addons in the **Installed** list and click **Uninstall selected** to remove them in one go.
+- An uninstall is all or nothing: if a folder is in use and cannot be moved, nothing is removed and the window says so.
+- An addon the updater kept up to date is also taken off its list when you uninstall it, so it is not installed again at the next check.
+- **Open its folder** in the **⋯** menu opens an installed addon's folder.
+- **Reinstall it** in the **⋯** menu installs the current version of an addon the updater keeps up to date again, with the same checksum checks, for example when its files were changed or damaged.
+
+### Improved
+- The **Installed** list shows how much space each addon takes and when it was last installed or updated.
+
 ## [1.2.11] - 2026-10-27
 
 ### Improved

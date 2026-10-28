@@ -53,6 +53,11 @@ namespace EldoUI.Updater
 				Check(Settings.Load(settingsPath).AddOnsDir == addOns, "settings are saved and read back");
 				var view = AddonRows.Sample(Path.Combine(home, "sample", "AddOns"));
 				Check(AddonRows.Find(view, "", null).Count >= AddonCatalog.All.Count && AddonRows.Installed(view, false).Count > 0, "the Extra addons window has its catalog and the installed addons");
+				string sampleAddOns = Path.Combine(home, "sample", "AddOns");
+				var removal = AddonRemover.Plan(sampleAddOns, view.Installed, new[] { "OldMapNotes" });
+				Check(removal != null && AddonRemover.Plan(sampleAddOns, view.Installed, new[] { "EldoUI" }) == null, "every installed addon but EldoUI can be uninstalled");
+				AddonRemover.Remove(sampleAddOns, removal, false);
+				Check(!Directory.Exists(Path.Combine(sampleAddOns, "OldMapNotes")) && Directory.Exists(Path.Combine(sampleAddOns, "EldoUI")), "an uninstall removes only that addon");
 
 				var system = LightforgeChecks.Evaluate(SystemInfo.Read(home));
 				var glibc = system.Find(c => c.Key == "lf.check.glibc");

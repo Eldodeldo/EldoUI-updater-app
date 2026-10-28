@@ -17,18 +17,22 @@ namespace EldoUI.Updater
 		public event Action<bool> InstallClicked;
 		public event Action<string> ImportChosen;
 		public event Action<string> ExportChosen;
+		/// <summary>The player confirmed uninstalling these Installed rows (their keys); true: delete their saved settings too.</summary>
+		public event Action<List<string>, bool> UninstallRequested;
 		/// <summary>The player resized the window or a column; the layout object holds the new sizes.</summary>
 		public event Action LayoutChanged;
 
 		readonly Font _head, _body, _small;
 		readonly Label _intro, _note, _message;
-		readonly EButton _tabFind, _tabInstalled, _install, _recommended, _import, _export, _close;
+		readonly EButton _tabFind, _tabInstalled, _install, _recommended, _import, _export, _close, _uninstall;
 		readonly TextBox _search;
 		readonly ComboBox _category;
 		readonly ECheck _showHidden;
 		readonly RowList _list;
 		readonly ContextMenuStrip _menu = new ContextMenuStrip { Renderer = new MenuRenderer(), ShowCheckMargin = true };
 		AddonsView _view = new AddonsView();
+		/// <summary>The Installed rows ticked to uninstall together.</summary>
+		readonly HashSet<string> _marked = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 		bool _installedTab;
 		bool _rendering;
 		WindowLayout _layout = new WindowLayout();
@@ -72,6 +76,9 @@ namespace EldoUI.Updater
 			_showHidden = new ECheck { Location = new Point(344, 100), Size = new Size(314, 26) };
 			_showHidden.CheckedChanged += (s, e) => { if (!_rendering) Fill(); };
 			Controls.Add(_showHidden);
+			_uninstall = new EButton { Location = new Point(488, 96), Size = new Size(170, 32), Visible = false };
+			_uninstall.Click += (s, e) => ConfirmUninstall(_marked.ToList());
+			Controls.Add(_uninstall);
 
 			_list = new RowList { Location = new Point(22, 138), Size = new Size(636, 370) };
 			_list.ColumnsChanged += shares => { _layout.Columns[ListKey] = shares.ToList(); LayoutChanged?.Invoke(); };
@@ -81,7 +88,13 @@ namespace EldoUI.Updater
 				else { _sortColumn = column; _sortDescending = false; }
 				Fill();
 			};
-			_list.Toggled += row => Raise(row.Checked == true ? AddonAction.Deselect : AddonAction.Select, row.Key);
+			_list.Toggled += row =>
+			{
+				if (!_installedTab) { Raise(row.Checked == true ? AddonAction.Deselect : AddonAction.Select, row.Key); return; }
+				if (_view.Busy) return;
+				if (!_marked.Remove(row.Key)) _marked.Add(row.Key);
+				Fill();
+			};
 			_list.ButtonClicked += row => Choose(new MenuChoice { Action = row.Button.Value, Arg = row.Button == AddonAction.Add ? row.Key.Substring("suggest:".Length) : MenuArg(row, row.Button.Value) });
 			_list.MenuRequested += (row, at) => ShowMenu(row, at);
 			Controls.Add(_list);
@@ -161,7 +174,8 @@ namespace EldoUI.Updater
 			int categoryWidth = S(170), searchWidth = Math.Max(S(150), Math.Min(S(260), w - 2 * m - S(322) - categoryWidth - S(8)));
 			_category.SetBounds(w - m - categoryWidth, S(100), categoryWidth, S(26));
 			_search.SetBounds(_category.Left - S(8) - searchWidth, S(101), searchWidth, S(24));
-			_showHidden.SetBounds(m + S(322), S(100), w - 2 * m - S(322), S(26));
+			_uninstall.SetBounds(w - m - categoryWidth, S(96), categoryWidth, S(32));
+			_showHidden.SetBounds(m + S(322), S(100), w - 2 * m - S(322) - categoryWidth - S(8), S(26));
 			_list.SetBounds(m, S(138), w - 2 * m, Math.Max(S(120), h - S(138) - S(112)));
 			_message.SetBounds(m, h - S(106), w - 2 * m, S(20));
 			int y = h - S(82);
@@ -236,6 +250,13 @@ namespace EldoUI.Updater
 			Fill();
 		}
 
+		/// <summary>Ticks Installed rows to uninstall together (the self-test and the window pictures use it).</summary>
+		public void Mark(params string[] keys)
+		{
+			foreach (string k in keys) _marked.Add(k);
+			Fill();
+		}
+
 		public void ShowMessage(string text, bool problem = false)
 		{
 			_message.ForeColor = problem ? Theme.Warn : Theme.Accent;
@@ -249,7 +270,7 @@ namespace EldoUI.Updater
 			_tabFind.Invalidate();
 			_tabInstalled.Invalidate();
 			_search.Visible = _category.Visible = !_installedTab;
-			_showHidden.Visible = _installedTab;
+			_showHidden.Visible = _uninstall.Visible = _installedTab;
 			int hidden = AddonRows.HiddenCount(_view);
 			_showHidden.Text = T.F("addons.showhidden", hidden);
 			_showHidden.Enabled = hidden > 0;
@@ -257,7 +278,9 @@ namespace EldoUI.Updater
 			string empty;
 			if (_installedTab)
 			{
-				rows = AddonRows.Installed(_view, _showHidden.Checked);
+				rows = AddonRows.Installed(_view, _showHidden.Checked, _marked);
+				// A ticked row that is gone (uninstalled, hidden or moved) is no longer ticked.
+				_marked.IntersectWith(rows.Where(r => r.Checked != null).Select(r => r.Key));
 				empty = !_view.HasFolder ? T.S("addons.nofolder") : T.S("addons.empty");
 			}
 			else
@@ -266,6 +289,9 @@ namespace EldoUI.Updater
 				rows = AddonRows.Find(_view, _search.Text, category);
 				empty = T.S("addons.none");
 			}
+			_uninstall.Text = T.F("addons.uninstall.selected", _marked.Count);
+			_uninstall.Enabled = !_view.Busy && _marked.Count > 0;
+			_uninstall.Invalidate();
 			if (_sortColumn >= 0) rows = AddonRows.Sort(rows, _sortColumn, _sortDescending);
 			_list.SetColumns(AddonRows.Headers(_installedTab), ColumnLayout.Shares(_layout, ListKey), _sortColumn, _sortDescending);
 			_list.SetRows(rows, empty, !_view.Busy);
@@ -284,7 +310,7 @@ namespace EldoUI.Updater
 			foreach (var choice in row.Menu)
 			{
 				var c = choice;
-				var item = new ToolStripMenuItem(c.Text) { Checked = c.Checked == true, Enabled = !_view.Busy || c.Action == AddonAction.OpenPage };
+				var item = new ToolStripMenuItem(c.Text) { Checked = c.Checked == true, Enabled = !_view.Busy || c.Action == AddonAction.OpenPage || c.Action == AddonAction.OpenFolder };
 				item.Click += (s, e) => Choose(c);
 				_menu.Items.Add(item);
 			}
@@ -293,6 +319,7 @@ namespace EldoUI.Updater
 
 		void Choose(MenuChoice c)
 		{
+			if (c.Action == AddonAction.Uninstall) { ConfirmUninstall(new List<string> { c.Arg }); return; }
 			if (c.Action == AddonAction.TakeOver)
 			{
 				var entry = AddonCatalog.Find(c.Arg);
@@ -307,8 +334,24 @@ namespace EldoUI.Updater
 
 		void Raise(AddonAction action, string arg)
 		{
-			if (_view.Busy && action != AddonAction.OpenPage) return;
+			if (_view.Busy && action != AddonAction.OpenPage && action != AddonAction.OpenFolder) return;
 			ActionRequested?.Invoke(action, arg);
+		}
+
+		/// <summary>Asks before anything is uninstalled; nothing happens unless the player says yes.</summary>
+		void ConfirmUninstall(List<string> keys)
+		{
+			if (_view.Busy || keys.Count == 0) return;
+			var plan = AddonRemover.Plan(_view.AddOnsDir, _view.Installed, keys);
+			if (plan == null) return;
+			bool settings;
+			using (var dialog = new UninstallDialog(plan, Icon))
+			{
+				if (dialog.ShowDialog(this) != DialogResult.OK) return;
+				settings = dialog.DeleteSettings;
+			}
+			_marked.ExceptWith(keys);
+			UninstallRequested?.Invoke(keys, settings);
 		}
 
 		void Import()
@@ -342,6 +385,107 @@ namespace EldoUI.Updater
 				_body.Dispose();
 				_small.Dispose();
 			}
+			base.Dispose(disposing);
+		}
+	}
+
+	/// <summary>
+	/// The question before an uninstall: what is deleted, what stops loading, and a box (off) for the saved
+	/// settings. Cancel has the focus, so Enter alone never deletes anything.
+	/// </summary>
+	sealed class UninstallDialog : Form
+	{
+		readonly Font _head, _body, _small;
+		readonly Label _title, _text, _hint;
+		readonly ECheck _box;
+		readonly EButton _yes, _no;
+
+		public bool DeleteSettings { get { return _box.Visible && _box.Checked; } }
+
+		public UninstallDialog(RemovalPlan plan, Icon icon)
+		{
+			_head = Theme.Body(11.5f, FontStyle.Bold);
+			_body = Theme.Body(9.75f);
+			_small = Theme.Body(8.5f);
+			AutoScaleMode = AutoScaleMode.None;
+			Icon = icon;
+			Text = AddonRows.RemovalTitle(plan);
+			FormBorderStyle = FormBorderStyle.FixedDialog;
+			MaximizeBox = MinimizeBox = false;
+			ShowInTaskbar = false;
+			StartPosition = FormStartPosition.CenterParent;
+			BackColor = Theme.Panel;
+			ForeColor = Theme.Text;
+			Font = _body;
+			_title = new Label { Text = Text, Font = _head, ForeColor = Theme.Text, AutoSize = false };
+			_text = new Label { Text = AddonRows.RemovalBody(plan), Font = _body, ForeColor = Theme.Muted, AutoSize = false };
+			string box = AddonRows.RemovalBox(plan);
+			_box = new ECheck { Text = box ?? "", Visible = box != null, Checked = false };
+			_hint = new Label { Text = T.S("addons.uninstall.hint"), Font = _small, ForeColor = Theme.Muted, AutoSize = false, Visible = box != null };
+			_yes = new EButton { Primary = true, Text = T.S("addons.uninstall.short"), DialogResult = DialogResult.OK };
+			_no = new EButton { Text = T.S("btn.cancel"), DialogResult = DialogResult.Cancel };
+			Controls.AddRange(new Control[] { _title, _text, _box, _hint, _yes, _no });
+			_no.TabIndex = 0;
+			_box.TabIndex = 1;
+			_yes.TabIndex = 2;
+			CancelButton = _no;
+		}
+
+		protected override void OnLoad(EventArgs e)
+		{
+			base.OnLoad(e);
+			ActiveControl = _no;
+		}
+
+		int S(int v) { return (int)Math.Round(v * DeviceDpi / 96f); }
+
+		protected override void OnHandleCreated(EventArgs e)
+		{
+			base.OnHandleCreated(e);
+			Theme.DarkTitleBar(Handle);
+			Arrange();
+		}
+
+		protected override void OnDpiChanged(DpiChangedEventArgs e)
+		{
+			base.OnDpiChanged(e);
+			Arrange();
+		}
+
+		/// <summary>Places every part for the screen's scale; the texts wrap and the window is as tall as they need.</summary>
+		void Arrange()
+		{
+			int m = S(22), w = S(460), inner = w - 2 * m, y = S(18);
+			const TextFormatFlags wrap = TextFormatFlags.WordBreak | TextFormatFlags.NoPadding | TextFormatFlags.TextBoxControl;
+			int h = TextRenderer.MeasureText(_title.Text, _head, new Size(inner, int.MaxValue), wrap).Height;
+			_title.SetBounds(m, y, inner, h + S(4));
+			y += h + S(12);
+			h = TextRenderer.MeasureText(_text.Text, _body, new Size(inner, int.MaxValue), wrap).Height;
+			_text.SetBounds(m, y, inner, h + S(4));
+			y += h + S(14);
+			if (_box.Visible)
+			{
+				_box.SetBounds(m, y, inner, S(26));
+				y += S(30);
+				h = TextRenderer.MeasureText(_hint.Text, _small, new Size(inner - S(26), int.MaxValue), wrap).Height;
+				_hint.SetBounds(m + S(26), y, inner - S(26), h + S(4));
+				y += h + S(14);
+			}
+			y += S(4);
+			_yes.SetBounds(w - m - S(130), y, S(130), S(34));
+			_no.SetBounds(w - m - S(130) - S(10) - S(110), y, S(110), S(34));
+			ClientSize = new Size(w, y + S(34) + S(18));
+		}
+
+		protected override void OnPaint(PaintEventArgs e)
+		{
+			Theme.Ornaments(e.Graphics, ClientRectangle, DeviceDpi / 96f);
+			base.OnPaint(e);
+		}
+
+		protected override void Dispose(bool disposing)
+		{
+			if (disposing) { _head.Dispose(); _body.Dispose(); _small.Dispose(); }
 			base.Dispose(disposing);
 		}
 	}

@@ -23,6 +23,8 @@ namespace EldoUI.Updater.Core
 		public HashSet<string> PreRelease = new HashSet<string>();
 		/// <summary>Addons whose hand-installed folders the player agreed the updater takes over at the next install.</summary>
 		public HashSet<string> Adopted = new HashSet<string>();
+		/// <summary>Addons the player asked to install again at the next check, even though they are up to date. Not saved.</summary>
+		public HashSet<string> Reinstall = new HashSet<string>();
 		/// <summary>AddOns folders the player chose not to see in the installed list.</summary>
 		public HashSet<string> IgnoredFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 		/// <summary>Keep the updater itself up to date.</summary>
@@ -49,7 +51,7 @@ namespace EldoUI.Updater.Core
 			if (!ExtraAddons) SelectedCompanions.Clear();
 			SelectedCompanions.Remove(id);
 			if (selected) SelectedCompanions.Add(id);
-			else { Held.Remove(id); PreRelease.Remove(id); Adopted.Remove(id); }
+			else { Held.Remove(id); PreRelease.Remove(id); Adopted.Remove(id); Reinstall.Remove(id); }
 			ExtraAddons = SelectedCompanions.Count > 0;
 		}
 

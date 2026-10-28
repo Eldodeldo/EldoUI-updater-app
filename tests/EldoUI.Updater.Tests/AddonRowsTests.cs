@@ -200,6 +200,102 @@ namespace EldoUI.Updater.Tests
 				Assert.Contains(shown.Menu, m => m.Action == AddonAction.Show && m.Arg == "Lonely");
 			}
 		}
+
+		[Fact]
+		public void EveryInstalledAddonButEldoUICanBeUninstalled()
+		{
+			using (var t = new TempDir())
+			{
+				var view = AddonRows.Sample(t.Sub("AddOns"));
+				var rows = AddonRows.Installed(view, false).Where(r => !r.Key.StartsWith("suggest:")).ToList();
+				Assert.Equal(view.Installed.Count, rows.Count);
+				foreach (var row in rows)
+				{
+					bool eldo = row.Key.Split('/').Any(AddonInstaller.IsEldoUIFolder);
+					Assert.Equal(!eldo, row.Menu.Any(m => m.Action == AddonAction.Uninstall && m.Arg == row.Key));
+					Assert.Contains(row.Menu, m => m.Action == AddonAction.OpenFolder);
+					if (eldo) Assert.Equal(T.S("addons.protected"), row.Tip);
+					// No tick boxes unless the window keeps a selection.
+					Assert.Null(row.Checked);
+				}
+				Assert.Contains(rows, r => r.Title == "Old Map Notes" && r.Menu.Any(m => m.Action == AddonAction.Uninstall));
+
+				var marked = new HashSet<string> { "OldMapNotes", "EldoUI" };
+				var ticked = AddonRows.Installed(view, false, marked);
+				Assert.True(ticked.Single(r => r.Key == "OldMapNotes").Checked);
+				Assert.False(ticked.Single(r => r.Key == "MoveAny").Checked);
+				Assert.Null(ticked.Single(r => r.Key == "EldoUI").Checked);
+				Assert.All(ticked.Where(r => r.Key.StartsWith("suggest:")), r => Assert.Null(r.Checked));
+			}
+		}
+
+		[Fact]
+		public void OnlyAnAddonThatFollowsItsReleasesCanBeReinstalled()
+		{
+			using (var t = new TempDir())
+			{
+				var view = AddonRows.Sample(t.Sub("AddOns"));
+				var rows = AddonRows.Installed(view, false);
+				Assert.Contains(rows.Single(r => r.Key.StartsWith("DBM-Core")).Menu, m => m.Action == AddonAction.Reinstall && m.Arg == "dbm");
+				// MoveAny is kept at its version, so installing the newest one again would break that promise.
+				Assert.DoesNotContain(rows.Single(r => r.Key == "MoveAny").Menu, m => m.Action == AddonAction.Reinstall);
+
+				var s = new Settings();
+				s.SelectCompanion("bugsack", true);
+				Assert.False(AddonRows.Apply(s, AddonAction.Reinstall, "bugsack"));
+				s.ExtraFiles["bugsack"] = new List<string> { "BugSack/BugSack.toc" };
+				Assert.True(AddonRows.Apply(s, AddonAction.Reinstall, "bugsack"));
+				Assert.Contains("bugsack", s.Reinstall);
+				s.Held.Add("bugsack");
+				s.Reinstall.Clear();
+				Assert.False(AddonRows.Apply(s, AddonAction.Reinstall, "bugsack"));
+				Assert.False(AddonRows.Apply(s, AddonAction.Uninstall, "BugSack"));
+				Assert.False(AddonRows.Apply(s, AddonAction.OpenFolder, "BugSack"));
+				Assert.Empty(s.Reinstall);
+			}
+		}
+
+		[Fact]
+		public void InstalledRowsShowSizeAndDate()
+		{
+			var a = new InstalledAddon { Name = "X", Folders = { "X", "X_Options" }, Bytes = 3 * 1024 * 1024 + 300 * 1024, Changed = new DateTime(2026, 10, 27, 12, 0, 0, DateTimeKind.Utc) };
+			string detail = AddonRows.Detail(a);
+			Assert.StartsWith("X, X_Options · ", detail);
+			Assert.Contains(" MB · ", detail);
+			Assert.Contains("2026", detail);
+			Assert.Equal("X", AddonRows.Detail(new InstalledAddon { Folders = { "X" } }));
+			Assert.EndsWith(" KB", AddonRows.Size(10));
+			Assert.EndsWith(" MB", AddonRows.Size(50L * 1024 * 1024));
+			Assert.EndsWith(" GB", AddonRows.Size(2L * 1024 * 1024 * 1024));
+		}
+
+		[Theory]
+		[InlineData("en")]
+		[InlineData("da")]
+		public void TheUninstallQuestionSaysWhatHappens(string language)
+		{
+			T.Use(language);
+			try
+			{
+				var one = new RemovalPlan { Names = { "Old Map Notes" }, Folders = { "OldMapNotes", "OldMapNotes_Options" }, NeededBy = { "Map Pins" }, SavedSettings = { "a.lua" }, Managed = true };
+				Assert.Contains("Old Map Notes", AddonRows.RemovalTitle(one));
+				string body = AddonRows.RemovalBody(one);
+				Assert.Contains("OldMapNotes, OldMapNotes_Options", body);
+				Assert.Contains("Map Pins", body);
+				Assert.Contains(T.S("addons.uninstall.managed"), body);
+				Assert.EndsWith(T.S("addons.uninstall.final"), body);
+				Assert.Contains(T.S("addons.uninstall.file"), AddonRows.RemovalBox(one));
+				Assert.Null(AddonRows.RemovalBox(new RemovalPlan { Names = { "X" }, Folders = { "X" } }));
+				var many = new RemovalPlan { Names = { "A", "B" }, Folders = { "A", "B" }, SavedSettings = { "a.lua", "b.lua" } };
+				Assert.Contains("2", AddonRows.RemovalTitle(many));
+				Assert.Contains(T.F("addons.uninstall.files", 2), AddonRows.RemovalBox(many));
+				Assert.DoesNotContain(T.S("addons.uninstall.managed"), AddonRows.RemovalBody(many));
+				string done = AddonRows.RemovalDone(one, new RemovalResult { SettingsDeleted = 1, LeftOver = true });
+				Assert.Contains("Old Map Notes", done);
+				Assert.Contains(T.S("addons.uninstall.leftover"), done);
+			}
+			finally { T.Use("en"); }
+		}
 	}
 
 	/// <summary>Every text the apps ask for exists in English and Danish.</summary>

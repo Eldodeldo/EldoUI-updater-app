@@ -332,6 +332,32 @@ namespace EldoUI.Updater.Tests
 		}
 
 		[Fact]
+		public async Task AReinstallDownloadsTheCurrentVersionAgainOnce()
+		{
+			using (var t = new TempDir())
+			{
+				var web = new FakeWeb();
+				Serve(web, "v1.0", BugSack(t.Path, "1.0"));
+				var s = Pick(t);
+				var updater = new CompanionUpdater(web, t.Sub("temp"));
+				await updater.CheckAsync(s, true, CancellationToken.None);
+				File.WriteAllText(t.Sub("AddOns", "BugSack", "core.lua"), "-- broken");
+				File.WriteAllText(t.Sub("AddOns", "BugSack", "Mine.lua"), "-- kept");
+				Assert.Equal(CompanionOutcome.Current, (await updater.CheckAsync(s, true, CancellationToken.None)).Single().Outcome);
+				s.Reinstall.Add("bugsack");
+				// A check that only looks installs nothing and keeps the request.
+				Assert.Equal(CompanionOutcome.Available, (await updater.CheckAsync(s, false, CancellationToken.None)).Single().Outcome);
+				Assert.Contains("bugsack", s.Reinstall);
+				var r = await updater.CheckAsync(s, true, CancellationToken.None);
+				Assert.Equal(CompanionOutcome.Installed, r.Single().Outcome);
+				Assert.Equal("-- 1.0", File.ReadAllText(t.Sub("AddOns", "BugSack", "core.lua")));
+				Assert.True(File.Exists(t.Sub("AddOns", "BugSack", "Mine.lua")));
+				Assert.Empty(s.Reinstall);
+				Assert.Equal(CompanionOutcome.Current, (await updater.CheckAsync(s, true, CancellationToken.None)).Single().Outcome);
+			}
+		}
+
+		[Fact]
 		public async Task AHeldAddonStaysAtItsVersion()
 		{
 			using (var t = new TempDir())

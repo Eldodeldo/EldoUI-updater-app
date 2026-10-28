@@ -1,6 +1,6 @@
 // Lists what is in the AddOns folder, grouped the way a player thinks of it: EldoUI, its guide data, the addons
-// the updater manages, known addons put there by hand, and everything else. Reading only: nothing is changed,
-// and a folder the updater does not manage is never taken over from here.
+// the updater manages, known addons put there by hand, and everything else, with each addon's size. Reading
+// only: nothing is changed, and a folder the updater does not manage is never taken over from here.
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -27,6 +27,11 @@ namespace EldoUI.Updater.Core
 		public List<string> Folders = new List<string>();
 		/// <summary>Addons it needs that are not in the AddOns folder.</summary>
 		public List<string> MissingDependencies = new List<string>();
+		/// <summary>Addons its folders need to load (other than its own folders), whether installed or not.</summary>
+		public List<string> Dependencies = new List<string>();
+		/// <summary>The size of its folders on disk, and when they were last put in place (installed or updated).</summary>
+		public long Bytes;
+		public DateTime? Changed;
 		/// <summary>Its .toc names WoW: Forever.</summary>
 		public bool Forever;
 		/// <summary>The player chose not to see it in the list.</summary>
@@ -93,13 +98,56 @@ namespace EldoUI.Updater.Core
 
 			foreach (var row in rows)
 			{
-				row.MissingDependencies = row.Folders.SelectMany(f => tocs[f] != null ? tocs[f].Dependencies : new List<string>())
-					.Where(d => !tocs.ContainsKey(d) && !d.StartsWith("Blizzard_", StringComparison.OrdinalIgnoreCase))
+				row.Dependencies = row.Folders.SelectMany(f => tocs[f] != null ? tocs[f].Dependencies : new List<string>())
+					.Where(d => !row.Folders.Contains(d, StringComparer.OrdinalIgnoreCase) && !d.StartsWith("Blizzard_", StringComparison.OrdinalIgnoreCase))
 					.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(d => d, StringComparer.OrdinalIgnoreCase).ToList();
+				row.MissingDependencies = row.Dependencies.Where(d => !tocs.ContainsKey(d)).ToList();
+				foreach (string f in row.Folders)
+				{
+					var size = Measure(Path.Combine(addOnsDir, f));
+					row.Bytes += size.Item1;
+					if (size.Item2.HasValue && (!row.Changed.HasValue || size.Item2 > row.Changed)) row.Changed = size.Item2;
+				}
 				if (row.State == AddonState.ByHand || row.State == AddonState.Other)
 					row.Ignored = row.Folders.All(settings.IgnoredFolders.Contains);
 			}
 			return rows;
+		}
+
+		// Sizes already measured, by folder and the time the folder last changed, so reopening the window stays quick.
+		static readonly Dictionary<string, Tuple<DateTime, long>> Sizes = new Dictionary<string, Tuple<DateTime, long>>(StringComparer.Ordinal);
+		const int MaxFilesMeasured = 200000;
+
+		/// <summary>A folder's size in bytes (links are not followed) and when it last changed.</summary>
+		static Tuple<long, DateTime?> Measure(string dir)
+		{
+			try
+			{
+				var info = new DirectoryInfo(dir);
+				DateTime changed = info.LastWriteTimeUtc;
+				Tuple<DateTime, long> known;
+				lock (Sizes)
+					if (Sizes.TryGetValue(info.FullName, out known) && known.Item1 == changed) return Tuple.Create(known.Item2, (DateTime?)changed);
+				long bytes = 0;
+				int files = 0;
+				var stack = new Stack<DirectoryInfo>();
+				if ((info.Attributes & FileAttributes.ReparsePoint) == 0) stack.Push(info);
+				while (stack.Count > 0 && files < MaxFilesMeasured)
+				{
+					var d = stack.Pop();
+					try
+					{
+						foreach (var f in d.GetFiles()) { bytes += f.Length; files++; }
+						foreach (var sub in d.GetDirectories()) if ((sub.Attributes & FileAttributes.ReparsePoint) == 0) stack.Push(sub);
+					}
+					catch (IOException) { }
+					catch (UnauthorizedAccessException) { }
+				}
+				lock (Sizes) Sizes[info.FullName] = Tuple.Create(changed, bytes);
+				return Tuple.Create(bytes, (DateTime?)changed);
+			}
+			catch (IOException) { return Tuple.Create(0L, (DateTime?)null); }
+			catch (UnauthorizedAccessException) { return Tuple.Create(0L, (DateTime?)null); }
 		}
 
 		static InstalledAddon Row(string name, AddonState state, string id, List<string> folders, Dictionary<string, TocInfo> tocs, string main)

@@ -4,6 +4,7 @@ using System;
 using System.IO;
 using Avalonia;
 using Avalonia.Headless;
+using EldoUI.Updater.Core;
 
 namespace EldoUI.Updater
 {
@@ -61,13 +62,20 @@ namespace EldoUI.Updater
 				foreach (string lang in new[] { "en", "da" })
 				{
 					LinuxTexts.Use(lang);
-					var view = AddonRows.Sample(Path.Combine(sample, "AddOns"));
+					string sampleAddOns = Path.Combine(sample, "_forever_", "Interface", "AddOns");
+					var view = AddonRows.Sample(sampleAddOns);
 					var addons = new AddonsWindow(Assets.Logo());
 					addons.Show();
 					addons.Render(view);
 					count += Save(addons, Path.Combine(dir, "linux-addons-find-" + lang + ".png"));
 					addons.ShowInstalled(true);
 					count += Save(addons, Path.Combine(dir, "linux-addons-installed-" + lang + ".png"));
+					addons.Mark("OldMapNotes", "MyErrorFrame");
+					count += Save(addons, Path.Combine(dir, "linux-addons-installed-marked-" + lang + ".png"));
+					var question = Dialogs.UninstallWindow(AddonRemover.Plan(sampleAddOns, view.Installed, new[] { "OldMapNotes" }), out _);
+					question.Show();
+					count += Save(question, Path.Combine(dir, "linux-addons-uninstall-" + lang + ".png"));
+					question.Close();
 					foreach (var size in new[] { Tuple.Create("small", 720, 540), Tuple.Create("large", 1280, 820) })
 					{
 						addons.Width = size.Item2;

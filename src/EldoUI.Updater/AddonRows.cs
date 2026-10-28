@@ -10,7 +10,7 @@ namespace EldoUI.Updater
 {
 	enum Tone { Plain, Ok, Info, Warn, Error }
 
-	enum AddonAction { Select, Deselect, Hold, PreRelease, OpenPage, TakeOver, Hide, Show, Add }
+	enum AddonAction { Select, Deselect, Hold, PreRelease, OpenPage, TakeOver, Hide, Show, Add, Uninstall, OpenFolder, Reinstall }
 
 	sealed class MenuChoice
 	{
@@ -129,7 +129,10 @@ namespace EldoUI.Updater
 			}
 		}
 
-		public static List<AddonRow> Installed(AddonsView view, bool showHidden)
+		/// <summary>
+		/// The Installed list. marked holds the rows the player ticked to uninstall together; null shows no tick boxes.
+		/// </summary>
+		public static List<AddonRow> Installed(AddonsView view, bool showHidden, ICollection<string> marked = null)
 		{
 			var rows = new List<AddonRow>();
 			foreach (var s in view.Suggestions)
@@ -146,25 +149,31 @@ namespace EldoUI.Updater
 			foreach (var a in view.Installed.Where(a => showHidden || !a.Ignored))
 			{
 				var entry = a.CatalogId != null ? AddonCatalog.Find(a.CatalogId) : null;
+				bool removable = AddonRemover.CanRemove(a);
 				var row = new AddonRow
 				{
-					Key = string.Join("/", a.Folders),
+					Key = AddonRemover.Key(a),
 					Title = a.State == AddonState.GuideData ? T.S("addons.state.guidedata") : a.Name,
 					Kind = a.State == AddonState.Managed && entry != null && view.Catalog.Any(c => c.Id == entry.Id && c.Held) ? T.S("extra.Held") : T.S("addons.state." + a.State.ToString().ToLowerInvariant()),
 					Extra = a.Version ?? "",
-					Detail = string.Join(", ", a.Folders),
+					Detail = Detail(a),
 					Note = Covered(entry),
 					Tone = a.State == AddonState.Managed || a.State == AddonState.EldoUI || a.State == AddonState.GuideData ? Tone.Ok : Tone.Plain,
+					Tip = removable ? null : T.S("addons.protected"),
 				};
+				if (marked != null && removable) row.Checked = marked.Contains(row.Key);
 				var notes = new List<string>();
 				if (!a.Forever) notes.Add(T.S("addons.notforever"));
 				if (a.MissingDependencies.Count > 0) notes.Add(T.F("addons.needs", string.Join(", ", a.MissingDependencies)));
 				if (notes.Count > 0) { row.Status = string.Join(" · ", notes); row.Tone = Tone.Warn; }
 				if (a.State == AddonState.Managed && entry != null)
 				{
-					row.Menu.Add(new MenuChoice { Text = T.S("addons.hold"), Checked = view.Catalog.Any(c => c.Id == entry.Id && c.Held), Action = AddonAction.Hold, Arg = entry.Id });
+					bool held = view.Catalog.Any(c => c.Id == entry.Id && c.Held);
+					row.Menu.Add(new MenuChoice { Text = T.S("addons.hold"), Checked = held, Action = AddonAction.Hold, Arg = entry.Id });
 					row.Menu.Add(new MenuChoice { Text = T.S("addons.prerelease"), Checked = view.Catalog.Any(c => c.Id == entry.Id && c.PreRelease), Action = AddonAction.PreRelease, Arg = entry.Id });
 					row.Menu.Add(new MenuChoice { Text = T.S("addons.stop"), Action = AddonAction.Deselect, Arg = entry.Id });
+					// A kept version is not replaced, so only an addon that follows its releases can be installed again.
+					if (!held && CanReinstall(view, entry)) row.Menu.Add(new MenuChoice { Text = T.S("addons.reinstall"), Action = AddonAction.Reinstall, Arg = entry.Id });
 				}
 				if (a.State == AddonState.ByHand && entry != null && entry.Installable)
 				{
@@ -177,6 +186,8 @@ namespace EldoUI.Updater
 					row.Menu.Add(a.Ignored
 						? new MenuChoice { Text = T.S("addons.show"), Action = AddonAction.Show, Arg = row.Key }
 						: new MenuChoice { Text = T.S("addons.hide"), Action = AddonAction.Hide, Arg = row.Key });
+				row.Menu.Add(new MenuChoice { Text = T.S("addons.openfolder"), Action = AddonAction.OpenFolder, Arg = MainFolder(a) });
+				if (removable) row.Menu.Add(new MenuChoice { Text = T.S("addons.uninstall"), Action = AddonAction.Uninstall, Arg = row.Key });
 				rows.Add(row);
 			}
 			return rows;
@@ -201,6 +212,76 @@ namespace EldoUI.Updater
 		}
 
 		public static int HiddenCount(AddonsView view) { return view.Installed.Count(a => a.Ignored); }
+
+		/// <summary>A catalog addon's name as the lists show it.</summary>
+		public static string CatalogName(string id)
+		{
+			var entry = AddonCatalog.Find(id);
+			return entry == null ? id : entry.Legacy != null ? entry.Legacy.Name : entry.Name;
+		}
+
+		static bool CanReinstall(AddonsView view, CatalogEntry entry)
+		{
+			return entry.Installable && entry.Source == AddonSource.GitHub && view.Catalog.Any(c => c.Id == entry.Id && c.Selected);
+		}
+
+		/// <summary>The folder named after the addon (the shortest name of its folders), for opening it.</summary>
+		static string MainFolder(InstalledAddon a)
+		{
+			return a.Folders.OrderBy(f => f.Length).ThenBy(f => f, StringComparer.OrdinalIgnoreCase).First();
+		}
+
+		/// <summary>The line under an installed addon: its folders, their size and when they were last installed or updated.</summary>
+		public static string Detail(InstalledAddon a)
+		{
+			var parts = new List<string> { string.Join(", ", a.Folders) };
+			if (a.Bytes > 0) parts.Add(Size(a.Bytes));
+			if (a.Changed.HasValue) parts.Add(T.F("addons.updated", a.Changed.Value.ToLocalTime().ToString("d", System.Globalization.CultureInfo.CurrentCulture)));
+			return string.Join(" · ", parts);
+		}
+
+		/// <summary>A size the way a file manager shows it: 640 KB, 4.2 MB, 1.3 GB.</summary>
+		public static string Size(long bytes)
+		{
+			var culture = System.Globalization.CultureInfo.CurrentCulture;
+			if (bytes < 1024 * 1024) return Math.Max(1, (bytes + 1023) / 1024).ToString(culture) + " KB";
+			if (bytes < 1024L * 1024 * 1024) return (bytes / (1024.0 * 1024)).ToString(bytes < 10L * 1024 * 1024 ? "0.0" : "0", culture) + " MB";
+			return (bytes / (1024.0 * 1024 * 1024)).ToString("0.0", culture) + " GB";
+		}
+
+		/// <summary>The question before an uninstall, the same on Windows and Linux.</summary>
+		public static string RemovalTitle(RemovalPlan plan)
+		{
+			return plan.Names.Count == 1 ? T.F("addons.uninstall.title", plan.Names[0]) : T.F("addons.uninstall.title.many", plan.Names.Count);
+		}
+
+		public static string RemovalBody(RemovalPlan plan)
+		{
+			bool many = plan.Names.Count > 1;
+			var lines = new List<string> { T.F("addons.uninstall.body", string.Join(", ", plan.Folders)) };
+			if (plan.Managed) lines.Add(T.S(many ? "addons.uninstall.managed.many" : "addons.uninstall.managed"));
+			if (plan.NeededBy.Count > 0) lines.Add(T.F(many ? "addons.uninstall.needed.many" : "addons.uninstall.needed", string.Join(", ", plan.NeededBy)));
+			lines.Add(T.S("addons.uninstall.final"));
+			return string.Join("\n\n", lines);
+		}
+
+		/// <summary>The text of the saved settings box, or null when the game keeps none for these folders.</summary>
+		public static string RemovalBox(RemovalPlan plan)
+		{
+			if (plan.SavedSettings.Count == 0) return null;
+			return T.F(plan.Names.Count > 1 ? "addons.uninstall.box.many" : "addons.uninstall.box", Files(plan.SavedSettings.Count));
+		}
+
+		/// <summary>What the window says after an uninstall.</summary>
+		public static string RemovalDone(RemovalPlan plan, RemovalResult result)
+		{
+			string text = plan.Names.Count == 1 ? T.F("addons.uninstall.done", plan.Names[0]) : T.F("addons.uninstall.done.many", plan.Names.Count);
+			if (result.SettingsDeleted > 0) text += " " + T.F("addons.uninstall.done.settings", Files(result.SettingsDeleted));
+			if (result.LeftOver) text += " " + T.S("addons.uninstall.leftover");
+			return text;
+		}
+
+		static string Files(int count) { return count == 1 ? T.S("addons.uninstall.file") : T.F("addons.uninstall.files", count); }
 
 		public static string StatusText(CatalogRow r)
 		{
@@ -259,6 +340,12 @@ namespace EldoUI.Updater
 					s.SelectCompanion(arg, true);
 					s.Adopted.Add(arg);
 					return true;
+				case AddonAction.Reinstall:
+					List<string> files;
+					if (!Settings.Selectable(arg) || !s.ExtraAddons || !s.SelectedCompanions.Contains(arg) || s.Held.Contains(arg)
+						|| !s.ExtraFiles.TryGetValue(arg, out files) || files.Count == 0) return false;
+					s.Reinstall.Add(arg);
+					return true;
 				case AddonAction.Hide:
 				case AddonAction.Show:
 					var folders = (arg ?? "").Split('/').Where(f => f.Length > 0).ToList();
@@ -275,14 +362,14 @@ namespace EldoUI.Updater
 		{
 			var tocs = new[]
 			{
-				new[] { "EldoUI", "EldoUI", "0.7.0003", "" },
-				new[] { "EldoUI_GuideData", "EldoUI Guide Data", "1.0.0", "EldoUI" },
-				new[] { "DBM-Core", "Deadly Boss Mods", "11.2.5", "" },
-				new[] { "DBM-StatusBarTimers", "DBM Timers", "11.2.5", "DBM-Core" },
-				new[] { "MoveAny", "MoveAny", "1.8.12", "" },
-				new[] { "Plater", "Plater Nameplates", "620", "" },
-				new[] { "MyErrorFrame", "My Error Frame", "2.1", "BugSack" },
-				new[] { "OldMapNotes", "Old Map Notes", "1.0", "" },
+				new[] { "EldoUI", "EldoUI", "0.7.0003", "", "6100" },
+				new[] { "EldoUI_GuideData", "EldoUI Guide Data", "1.0.0", "EldoUI", "1240" },
+				new[] { "DBM-Core", "Deadly Boss Mods", "11.2.5", "", "2460" },
+				new[] { "DBM-StatusBarTimers", "DBM Timers", "11.2.5", "DBM-Core", "310" },
+				new[] { "MoveAny", "MoveAny", "1.8.12", "", "920" },
+				new[] { "Plater", "Plater Nameplates", "620", "", "3180" },
+				new[] { "MyErrorFrame", "My Error Frame", "2.1", "BugSack", "64" },
+				new[] { "OldMapNotes", "Old Map Notes", "1.0", "", "450" },
 			};
 			Directory.CreateDirectory(addOnsDir);
 			foreach (var t in tocs)
@@ -291,6 +378,17 @@ namespace EldoUI.Updater
 				Directory.CreateDirectory(dir);
 				string iface = t[0] == "OldMapNotes" ? "11507" : "16001";
 				File.WriteAllText(Path.Combine(dir, t[0] + ".toc"), "## Interface: " + iface + "\n## Title: " + t[1] + "\n## Version: " + t[2] + "\n" + (t[3].Length > 0 ? "## Dependencies: " + t[3] + "\n" : ""));
+				// A sparse file, so the sizes look real without writing megabytes.
+				using (var media = new FileStream(Path.Combine(dir, "media.tga"), FileMode.Create)) media.SetLength(long.Parse(t[4]) * 1024);
+			}
+			// Saved settings for one addon, when the sample sits in a game folder (Interface\AddOns next to WTF).
+			string flavorInterface = Path.GetDirectoryName(addOnsDir.TrimEnd('\\', '/'));
+			if (flavorInterface != null && string.Equals(Path.GetFileName(flavorInterface), "Interface", StringComparison.OrdinalIgnoreCase))
+			{
+				string saved = Path.Combine(Path.GetDirectoryName(flavorInterface), "WTF", "Account", "PLAYER", "SavedVariables");
+				Directory.CreateDirectory(saved);
+				File.WriteAllText(Path.Combine(saved, "OldMapNotes.lua"), "OldMapNotesDB = {}\n");
+				File.WriteAllText(Path.Combine(saved, "OldMapNotes.lua.bak"), "OldMapNotesDB = {}\n");
 			}
 			var s = new Settings { AddOnsDir = addOnsDir };
 			foreach (string id in new[] { "dbm", "move-any", "bigwigs", "plater", "elvui" }) s.SelectCompanion(id, true);

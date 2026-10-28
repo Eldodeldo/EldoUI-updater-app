@@ -76,7 +76,8 @@ Danish), EldoUI on GitHub, and exit.
   unpacked next to AddOns first and then swapped in; if anything fails, the old folders are put back.
 - It manages only EldoUI's own folders: the ones in the zip and the ones it installed before. Other addons
   are managed only after you choose them in **Extra addons** (below). The game's `WTF` folder (your
-  settings) is never touched.
+  settings) is never touched, except for an addon's own saved settings when you uninstall it and tick the
+  box for them.
 - The updater updates itself from this repository's releases, with the same checksum rule.
 
 ## Privacy and safety
@@ -95,6 +96,8 @@ Danish), EldoUI on GitHub, and exit.
 - **Writes:** EldoUI's folders and the folders of addons you chose in AddOns, and its own files (on Linux,
   the installed AppImage is runnable only by your user). WoW Linux setup writes Lightforge's
   files only when you click its install button (see below).
+- **Deletes:** only addon folders you chose to uninstall in **Extra addons** and confirmed, and their saved
+  settings only when you ticked the box for them.
 
 | What | Windows | Linux |
 | --- | --- | --- |
@@ -166,8 +169,17 @@ a heading to sort the list by it; the window keeps its size and column widths fo
 - **Choices per addon** (the **⋯** button): keep it at your version, take pre-releases, open its page, or
   stop updating it (it stays installed).
 - **Installed** shows everything in your AddOns folder grouped by addon: EldoUI, the Eldostar guide data,
-  addons the updater keeps up to date, and the rest. It shows addons not made for Forever and missing
-  dependencies, and offers a catalog addon that another addon needs. Hide rows you do not want to see.
+  addons the updater keeps up to date, and the rest, with each addon's size and when it was last installed
+  or updated. It shows addons not made for Forever and missing dependencies, and offers a catalog addon
+  that another addon needs. Hide rows you do not want to see. Its **⋯** menu also opens the addon's folder,
+  and for an addon the updater keeps up to date, **Reinstall it** installs the current version again.
+- **Uninstall** any addon in **Installed** from its **⋯** menu, or tick several and click **Uninstall
+  selected**. The updater first asks, listing the folders that go and the installed addons that need them.
+  The addon's saved settings in the game's `WTF` folder stay unless you tick **Also delete its saved
+  settings**; close the game first if you do, since it writes them again when you log out. The folders are
+  moved aside first, so a folder in use stops the whole uninstall and nothing is lost. An addon the updater
+  kept up to date is taken off its list, so it is not installed again. EldoUI's own folders and the
+  Eldostar guide data cannot be uninstalled here: the updater looks after them.
 - **Import and Export** save your choices to a small file (`eldoui-addons.json`) with catalog names only,
   to move them to another PC.
 - Updates keep files you added, install into a staging folder first and put the old folders back if

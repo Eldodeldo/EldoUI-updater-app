@@ -35,12 +35,14 @@ namespace EldoUI.Updater.Core
 		public List<Suggestion> Suggestions = new List<Suggestion>();
 		public bool Busy;
 		public bool HasFolder;
+		/// <summary>The AddOns folder the list was read from.</summary>
+		public string AddOnsDir;
 
 		public static AddonsView Build(Settings settings, IEnumerable<CompanionResult> last, List<InstalledAddon> installed, bool busy)
 		{
 			var results = (last ?? Enumerable.Empty<CompanionResult>()).Where(r => r.Id != null).GroupBy(r => r.Id).ToDictionary(g => g.Key, g => g.Last());
 			var byHand = new HashSet<string>((installed ?? new List<InstalledAddon>()).Where(r => r.State == AddonState.ByHand && r.CatalogId != null).Select(r => r.CatalogId));
-			var view = new AddonsView { Busy = busy, Installed = installed ?? new List<InstalledAddon>(), HasFolder = !string.IsNullOrEmpty(settings.AddOnsDir) };
+			var view = new AddonsView { Busy = busy, Installed = installed ?? new List<InstalledAddon>(), HasFolder = !string.IsNullOrEmpty(settings.AddOnsDir), AddOnsDir = settings.AddOnsDir };
 			foreach (var e in AddonCatalog.All)
 			{
 				var row = new CatalogRow

@@ -129,7 +129,9 @@ namespace EldoUI.Updater.Core
 					List<string> files;
 					bool installed = settings.ExtraFiles.TryGetValue(entry.Id, out files) && files.Count > 0
 						&& files.All(f => addon.Owns(f) && File.Exists(Path.Combine(settings.AddOnsDir, f.Replace('/', Path.DirectorySeparatorChar))));
-					if (installed && settings.ExtraVersions.TryGetValue(entry.Id, out previous) && previous == release.Tag)
+					// A reinstall the player asked for downloads the current version again, with the same checks.
+					bool again = settings.Reinstall.Contains(entry.Id);
+					if (installed && !again && settings.ExtraVersions.TryGetValue(entry.Id, out previous) && previous == release.Tag)
 					{
 						result.Outcome = CompanionOutcome.Current;
 						continue;
@@ -154,6 +156,7 @@ namespace EldoUI.Updater.Core
 					settings.ExtraFiles[entry.Id] = CompanionInstaller.Install(addon, zip, settings.AddOnsDir, files, ct, guard);
 					settings.ExtraVersions[entry.Id] = release.Tag;
 					settings.Adopted.Remove(entry.Id);
+					settings.Reinstall.Remove(entry.Id);
 					result.Outcome = CompanionOutcome.Installed;
 				}
 				catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
