@@ -40,3 +40,44 @@ release. Platform self-tests also check rejection before replacement.
 The Windows .NET Framework self-test and shared unit tests were run locally.
 Both platform projects compile; the Linux runtime self-test and actual public
 release rollout remain separate CI/owner checks.
+
+## Complete package
+
+From EldoUI 0.7.1000 the release zip holds the main addon and five companion
+addons that load only when needed: `EldoUI_Emoji`, `EldoUI_GuideData`,
+`EldoUI_Locale_daDK`, `EldoUI_LootData` and `EldoUI_LootSim`. Each is a
+sibling of `EldoUI` with its own matching TOC. The developer companion is not
+part of the standard package. A companion that the game has not loaded yet is
+installed and complete all the same.
+
+- One trusted SHA-256 covers the whole zip, so every folder in it is verified
+  before anything is unpacked, including companions the player never loads.
+- Only the main TOC must match the selected release version. Companion TOCs
+  keep their own versions and are never required to equal the main version.
+- A wrong or missing checksum, an unsafe path in any folder, a folder without
+  its matching TOC, a folder that is not EldoUI's, or a main TOC with another
+  version leaves the existing install, WTF and other addons byte for byte as
+  they were.
+- If a move fails partway, every folder that already moved is put back. The
+  next check installs the release again.
+- An upgrade replaces only the folders in the zip and removes only folders
+  the updater installed earlier that the new release no longer has. Saved
+  settings in WTF, the player's in-game addon choices, other addons and
+  EldoUI folders the updater did not install (such as a developer companion)
+  stay untouched. A fresh addon profile is the addon's own one-time step; the
+  updater never deletes saved settings for it.
+
+`tests/EldoUI.Updater.Tests/FullPackageTests.cs` covers these cases. To check
+a published release zip end to end in a temporary game folder:
+
+```sh
+ELDOUI_RELEASE_ZIP=/path/to/EldoUI-<version>.zip \
+ELDOUI_RELEASE_VERSION=<version> \
+ELDOUI_RELEASE_SHA256=<published sha256> \
+ELDOUI_PREVIOUS_ZIP=/path/to/EldoUI-<previous>.zip \
+dotnet test tests/EldoUI.Updater.Tests --filter ReleasePackageTests --logger "console;verbosity=detailed"
+```
+
+`ELDOUI_PREVIOUS_ZIP` is optional and checks the upgrade from that release.
+The expected folder list is `FullPackage.Companions` in that file; change it
+together with the published package.
